@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.prefs.Preferences;
@@ -51,18 +52,7 @@ import javax.xml.parsers.SAXParserFactory;
 
 import org.concord.energy2d.event.ManipulationEvent;
 import org.concord.energy2d.event.ManipulationListener;
-import org.concord.energy2d.model.Anemometer;
-import org.concord.energy2d.model.Cloud;
-import org.concord.energy2d.model.Fan;
-import org.concord.energy2d.model.HeatFluxSensor;
-import org.concord.energy2d.model.Heliostat;
-import org.concord.energy2d.model.Model2D;
-import org.concord.energy2d.model.Part;
-import org.concord.energy2d.model.Particle;
-import org.concord.energy2d.model.ParticleFeeder;
-import org.concord.energy2d.model.Sensor;
-import org.concord.energy2d.model.Thermometer;
-import org.concord.energy2d.model.Tree;
+import org.concord.energy2d.model.*;
 import org.concord.energy2d.util.MiscUtil;
 import org.concord.energy2d.view.Picture;
 import org.concord.energy2d.view.TextBox;
@@ -980,8 +970,54 @@ public class System2D extends JApplet implements ManipulationListener {
     public static void main(final String[] args) {
         EventQueue.invokeLater(() -> {
             start(args);
-            Updater.download(box);
+            //Updater.download(box);
+            View2D viewBox = box.getView();
+            Model2D modelBox = box.getModel();
+            box.loadModel("examples/thermostat.e2d");
+            viewBox.notifyManipulationListeners(null, ManipulationEvent.RUN);
+            List<Thermometer> thermometers = modelBox.getThermometers();
+            //modelBox.setTimeStep(0.1f);
+
+            List<Thermostat> thermostats = modelBox.getThermostats();
+            Thermostat thermostat0 = thermostats.get(0);
+            Thermometer tempTherm = thermostat0.getThermometer();
+            thermostat0.setSetPoint(1000f);
+            System.out.println(thermostat0.toXml());
+            //System.out.println(thermostat.getPowerSource().getTemperature());
+            //System.out.println(tempTherm.getName());
+
+            java.util.Timer timer = new java.util.Timer();
+            float thermostat0Power = thermostat0.getPowerSource().getPower();
+            TimerTask task = new TimerTask() {
+                @Override
+                public void run() {
+                    System.out.println(tempTherm.getCurrentData() + " lülitab välja");
+                    thermostat0.getPowerSource().setPower(0.000001f);
+                }
+            };
+            TimerTask task2 = new TimerTask() {
+                @Override
+                public void run() {
+                    System.out.println(tempTherm.getCurrentData() + " lülitab sisse");
+                    //System.out.println(thermostat.getPowerSource().getPowerSwitch());
+                    thermostat0.getPowerSource().setPower(thermostat0Power);
+                }
+            };
+            TimerTask task3 = new TimerTask() {
+                @Override
+                public void run() {
+                    System.out.println(thermostat0.getPowerSource().getPower() + " kontroll");
+                }
+            };
+            timer.schedule(task, 2000L);
+            timer.schedule(task2, 10000L);
+            timer.schedule(task3, 0L, 1000L);
+
+
+
+
         });
+
     }
 
     private static void start(final String[] args) {
