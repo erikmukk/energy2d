@@ -22,14 +22,15 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.TimerTask;
+import java.text.DecimalFormat;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.prefs.Preferences;
 
 import javax.swing.AbstractAction;
@@ -64,6 +65,9 @@ import org.xml.sax.helpers.DefaultHandler;
 import com.apple.eawt.Application;
 import com.apple.eawt.ApplicationAdapter;
 import com.apple.eawt.ApplicationEvent;
+
+import qlearning.*;
+
 
 /**
  * Deploy as an app (energy2d.jar) or an applet (energy2d-applet.jar). The applet has no menu bar and tool bar and doesn't include /models and /resources.
@@ -964,58 +968,244 @@ public class System2D extends JApplet implements ManipulationListener {
         } catch (final Throwable t) {
             t.printStackTrace();
         }
+    }
 
+
+    private static final int CORRECT_HEATING_REWARD = 100;
+    private static final int INCORRECT_HEATING_PENALTY = -400;
+    private static final double EPS_DECAY = 0.9998;
+    private static final double LEARNING_RATE = 0.1;
+    private static final double DISCOUNT = 0.95;
+
+    private static int findArgmax(double[] array) {
+        float max = -2000000000;
+        int index = 0;
+        for (int i = 0 ; i < array.length ; i++) {
+            if (array[i] > max) {
+                max = i;
+                index = i;
+            }
+        } return index;
+    }
+
+    private static double findMax(double[] array) {
+        double max = -2000000000;
+        for (double i : array) {
+            if (i > max) {
+                max = i;
+            }
+        } return max;
+    }
+
+    private static int getCorrectAction(Environment env) {
+        boolean isHeating = env.isHeating();
+        boolean isHumanPresence = env.isHumanPresence();
+        double outsideTemp = env.getOutsideTemp();
+        double insideTemp = env.getInsideTemp();
+
+        int correctAction = env.DO_NOTHING;
+
+        /*if (!isHumanPresence) {
+            if (isHeating) {
+                correctAction = env.STOP_HEATING;
+            }
+        } else {
+            if (isHeating) {
+                if (insideTemp >= outsideTemp & insideTemp >= 20) {
+                    correctAction = env.STOP_HEATING;
+                } else {
+                    if (outsideTemp >= 20) {
+                        correctAction = env.STOP_HEATING;
+                    } else {
+                        correctAction = env.HEAT;
+                    }
+                }
+            } else {
+                if (insideTemp < 20) {
+                    if (outsideTemp < 20) {
+                        correctAction = env.HEAT;
+                    } else {
+                        correctAction = env.STOP_HEATING;
+                    }
+                }
+            }
+        }*/
+        if (!isHumanPresence) {
+            if (isHeating) {
+                correctAction = env.STOP_HEATING;
+            }
+        } else {
+            if (isHeating) {
+                if (insideTemp >= 20) {
+                    correctAction = env.STOP_HEATING;
+                } else {
+                    correctAction = env.HEAT;
+                }
+            } else {
+                if (insideTemp < 20) {
+                    correctAction = env.HEAT;
+                }
+                else {
+                    correctAction = env.STOP_HEATING;
+                }
+            }
+        }
+        return correctAction;
+    }
+
+    private static void setupSimulation() {
+        Model2D modelBox = box.getModel();
+        box.loadModel("examples/thermostat.e2d");
+        modelBox.setTimeStep(10f);
+        modelBox.getThermostats().get(0).setDeadband(100000f);
+    }
+
+    private static void startSimulation() {
+        View2D viewBox = box.getView();
+        viewBox.notifyManipulationListeners(null, ManipulationEvent.RUN);
+    }
+    /*
+     float thermostat0Power = thermostat0.getPowerSource().getPower();
+     thermostat0.getPowerSource().setPower(0.000001f);
+     thermostat0.getPowerSource().setPower(thermostat0Power);
+     */
+    public static double round(float value, int places) {
+        if (places < 0) throw new IllegalArgumentException();
+        BigDecimal bd = BigDecimal.valueOf(value);
+        bd = bd.setScale(places, RoundingMode.HALF_UP);
+        return bd.doubleValue();
+    }
+
+
+    // ca 4 sekundiga läbib 24h (kui timestep 10f). töötab 5 minutise kontrolliga, kui muid protsesse samal ajal ei käi
+    private static void afterStartSimulation() {
+        QLearningModel qLearningModel = new QLearningModel();
+        //HashMap<CustomPair<CustomPair<Boolean, Boolean>, CustomPair<Double, Double>>, double[]> qTable = qLearningModel.getqTable();
+        HashMap<Double, double[]> qTable = qLearningModel.getqTable();
+
+        //CustomPair<Boolean, Boolean> p1 = new CustomPair<>(true, true);
+        //CustomPair<Double, Double> p2 = new CustomPair<>(3.0, 25.4);
+        //CustomPair<CustomPair<?, ?>, CustomPair<?, ?>> obs = new CustomPair<>(p1, p2);
+        Model2D modelBox = box.getModel();
+
+        java.util.Timer timer = new java.util.Timer();
+        DecimalFormat f = new DecimalFormat("##.0");
+
+
+        TimerTask task = new TimerTask() {
+            int previousModelBoxTimestampInMinutes = 0;
+            Environment env = null;
+            double epsilon = 0.9;
+            int episodeReward = 0;
+            ArrayList<Integer> episodeRewards = new ArrayList<>();
+            @Override
+            public void run() {
+                int modelBoxTime = (int) (modelBox.getTime() / 60);
+                // 24H = 1440min = 1 episode
+                // 1440 min = 288 loops
+                if (modelBoxTime == 0 || env == null) {
+                    env = new Environment(0f, 0f);
+                    epsilon *= EPS_DECAY;
+                    episodeRewards.add(episodeReward);
+                    episodeReward = 0;
+
+                    // set environment values based on model
+                    //System.out.println(modelBox.getThermometers().get(0).getCurrentData());
+                    double insideTemp = round(0, 1);
+                    double outsideTemp = round(0, 1);
+                    env.setInsideTemp(insideTemp);
+                    env.setOutsideTemp(outsideTemp);
+                }
+                // If 5 minutes have passed or day is about to be over
+                if (modelBoxTime >= previousModelBoxTimestampInMinutes + 5 & modelBoxTime <= 1440) {
+                    double insideTemp = round(modelBox.getThermometers().get(0).getCurrentData(), 1);
+                    double outsideTemp = round(modelBox.getBackgroundTemperature(), 1);
+                    env.setInsideTemp(insideTemp);
+                    env.setOutsideTemp(outsideTemp);
+
+                    //CustomPair<Boolean, Boolean> p1 = new CustomPair<>(env.isHeating(), env.isHumanPresence());
+                    //CustomPair<Double, Double> p2 = new CustomPair<>(env.getOutsideTemp(), env.getInsideTemp());
+                    //CustomPair<CustomPair<Boolean, Boolean>, CustomPair<Double, Double>> obs = new CustomPair<>(p1, p2);
+                    Double obs = env.getInsideTemp();
+
+                    // get action randomly or based on q table
+                    double[] _actions = qTable.get(obs);
+                    int calculatedAction;
+                    if (Math.random() > epsilon) {
+                        calculatedAction = findArgmax(_actions);
+                    } else {
+                        calculatedAction = (int)(Math.random() * (env.getActionSpace().length - 1) + 1);
+                    }
+                    // find what action was wanted and do calculated action
+                    int wantedAction = getCorrectAction(env);
+                    env.takeAction(calculatedAction);
+                    Thermostat thermostat =  modelBox.getThermostats().get(0);
+                    if (calculatedAction == env.HEAT) {
+                        thermostat.getPowerSource().setPower(0.000001f);
+                    } else if (calculatedAction == env.STOP_HEATING) {
+                        thermostat.getPowerSource().setPower(200);
+                    }
+
+                    // calculate reward based on calculated and wanted action
+                    int reward;
+                    if (wantedAction == calculatedAction) {
+                        reward = CORRECT_HEATING_REWARD;
+                    } else {
+                        reward = INCORRECT_HEATING_PENALTY;
+                    }
+
+                    // find new observation space
+                    //CustomPair<Boolean, Boolean> np1 = new CustomPair<>(env.isHeating(), env.isHumanPresence());
+                    //CustomPair<Double, Double> np2 = new CustomPair<>(env.getOutsideTemp(), env.getInsideTemp());
+                    //CustomPair<CustomPair<Boolean, Boolean>, CustomPair<Double, Double>> nObs = new CustomPair<>(np1, np2);
+                    Double nObs = env.getInsideTemp();
+                    double maxFutureQValue;
+                    maxFutureQValue = findMax(qTable.get(nObs));
+
+                    double currentQ = qTable.get(obs)[calculatedAction];
+                    double newQ;
+                    if (reward == CORRECT_HEATING_REWARD) {
+                        newQ = CORRECT_HEATING_REWARD;
+                    } else {
+                        newQ = (1-LEARNING_RATE) * currentQ + LEARNING_RATE * (episodeReward + DISCOUNT * maxFutureQValue);
+                    }
+                    _actions[calculatedAction] = newQ;
+                    qTable.put(obs, _actions);
+                    episodeReward += reward;
+
+                    previousModelBoxTimestampInMinutes = modelBoxTime;
+                    System.out.println(modelBoxTime);
+                    if (modelBoxTime >= 1440) {
+                        View2D viewBox = box.getView();
+                        viewBox.notifyManipulationListeners(null, ManipulationEvent.RESET);
+                        previousModelBoxTimestampInMinutes = 0;
+                        //viewBox.notifyManipulationListeners(null, ManipulationEvent.RUN);
+                    }
+                }
+                if (modelBoxTime >= 1440) {
+                    View2D viewBox = box.getView();
+                    viewBox.notifyManipulationListeners(null, ManipulationEvent.RESET);
+                    previousModelBoxTimestampInMinutes = 0;
+                    viewBox.notifyManipulationListeners(null, ManipulationEvent.RUN);
+                }
+            }
+        };
+        timer.schedule(task, 0L, 1000);
     }
 
     public static void main(final String[] args) {
         EventQueue.invokeLater(() -> {
             start(args);
+            setupSimulation();
+
+
+            EventQueue.invokeLater(() -> {
+                startSimulation();
+                EventQueue.invokeLater(() -> {
+                    afterStartSimulation();
+                });
+            });
             //Updater.download(box);
-            View2D viewBox = box.getView();
-            Model2D modelBox = box.getModel();
-            box.loadModel("examples/thermostat.e2d");
-            viewBox.notifyManipulationListeners(null, ManipulationEvent.RUN);
-            List<Thermometer> thermometers = modelBox.getThermometers();
-            //modelBox.setTimeStep(0.1f);
-
-            List<Thermostat> thermostats = modelBox.getThermostats();
-            Thermostat thermostat0 = thermostats.get(0);
-            Thermometer tempTherm = thermostat0.getThermometer();
-            thermostat0.setSetPoint(1000f);
-            System.out.println(thermostat0.toXml());
-            //System.out.println(thermostat.getPowerSource().getTemperature());
-            //System.out.println(tempTherm.getName());
-
-            java.util.Timer timer = new java.util.Timer();
-            float thermostat0Power = thermostat0.getPowerSource().getPower();
-            TimerTask task = new TimerTask() {
-                @Override
-                public void run() {
-                    System.out.println(tempTherm.getCurrentData() + " lülitab välja");
-                    thermostat0.getPowerSource().setPower(0.000001f);
-                }
-            };
-            TimerTask task2 = new TimerTask() {
-                @Override
-                public void run() {
-                    System.out.println(tempTherm.getCurrentData() + " lülitab sisse");
-                    //System.out.println(thermostat.getPowerSource().getPowerSwitch());
-                    thermostat0.getPowerSource().setPower(thermostat0Power);
-                }
-            };
-            TimerTask task3 = new TimerTask() {
-                @Override
-                public void run() {
-                    System.out.println(thermostat0.getPowerSource().getPower() + " kontroll");
-                }
-            };
-            timer.schedule(task, 2000L);
-            timer.schedule(task2, 10000L);
-            timer.schedule(task3, 0L, 1000L);
-
-
-
-
         });
 
     }
