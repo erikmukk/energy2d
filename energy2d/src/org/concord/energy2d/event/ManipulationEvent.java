@@ -29,6 +29,9 @@ public class ManipulationEvent extends EventObject {
 	public static final byte HEATING_MODE_CHOSEN = 22;
 	public static final byte FATAL_ERROR_OCCURRED = 99;
 
+	public static final byte CUSTOM_MODEL_PAUSE = 127;
+	public static final byte CUSTOM_MODEL_RESET = 126;
+
 	private Object target;
 	private byte type = -1;
 

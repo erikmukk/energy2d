@@ -660,9 +660,168 @@ public class System2D extends JApplet implements ManipulationListener {
         return scripter;
     }
 
+    static float outsideInitTemp = 0;
+    static float insideInitTemp = 0;
+    static HashMap<Double, double[]> qTable = new HashMap<>();
+    static Environment env = new Environment(0.0, 0.0);
+    static float episodeReward = 0;
+
+    private static final int CORRECT_HEATING_REWARD = 100;
+    private static final int INCORRECT_HEATING_PENALTY = -400;
+    private static final double EPS_DECAY = 0.9998;
+    private static final double LEARNING_RATE = 0.1;
+    private static final double DISCOUNT = 0.95;
+    static double epsilon = 0.9;
+    static int correct = 0;
+    static int incorrect = 0;
+
+    private static int findArgmax(double[] array) {
+        float max = -2000000000;
+        int index = 0;
+        for (int i = 0 ; i < array.length ; i++) {
+            if (array[i] > max) {
+                max = i;
+                index = i;
+            }
+        } return index;
+    }
+
+    private static double findMax(double[] array) {
+        double max = -2000000000;
+        for (double i : array) {
+            if (i > max) {
+                max = i;
+            }
+        } return max;
+    }
+
+    private static int getCorrectAction(Environment env) {
+        boolean isHeating = env.isHeating();
+        boolean isHumanPresence = env.isHumanPresence();
+        double outsideTemp = env.getOutsideTemp();
+        double insideTemp = env.getInsideTemp();
+
+        int correctAction = env.DO_NOTHING;
+
+        if (!isHumanPresence) {
+            if (isHeating) {
+                correctAction = env.STOP_HEATING;
+            }
+        } else {
+            if (isHeating) {
+                if (insideTemp >= 20) {
+                    correctAction = env.STOP_HEATING;
+                } else {
+                    correctAction = env.HEAT;
+                }
+            } else {
+                if (insideTemp < 20) {
+                    correctAction = env.HEAT;
+                }
+                else {
+                    correctAction = env.STOP_HEATING;
+                }
+            }
+        }
+        return correctAction;
+    }
+
+    private static void setupSimulation() {
+        Model2D modelBox = box.getModel();
+        box.loadModel("examples/thermostat.e2d");
+        modelBox.setTimeStep(10f);
+        modelBox.getThermostats().get(0).setDeadband(10000f);
+        for ( float i = -50 ; i <= 50.1f ; i+=0.1f) {
+            qTable.put(round(i, 1), new double[]{0, 0, 0});
+        }
+    }
+
+    private static void startSimulation() {
+        View2D viewBox = box.getView();
+        viewBox.notifyManipulationListeners(null, ManipulationEvent.RUN);
+    }
+    /*
+     float thermostat0Power = thermostat0.getPowerSource().getPower();
+     thermostat0.getPowerSource().setPower(0.000001f);
+     thermostat0.getPowerSource().setPower(thermostat0Power);
+     */
+    public static double round(float value, int places) {
+        if (places < 0) throw new IllegalArgumentException();
+        BigDecimal bd = BigDecimal.valueOf(value);
+        bd = bd.setScale(places, RoundingMode.HALF_UP);
+        return bd.doubleValue();
+    }
+
+
+    // ca 4 sekundiga läbib 24h (kui timestep 10f). töötab 5 minutise kontrolliga, kui muid protsesse samal ajal ei käi
+    private static void afterStartSimulation() {
+        //HashMap<CustomPair<CustomPair<Boolean, Boolean>, CustomPair<Double, Double>>, double[]> qTable = qLearningModel.getqTable();
+
+        //CustomPair<Boolean, Boolean> p1 = new CustomPair<>(true, true);
+        //CustomPair<Double, Double> p2 = new CustomPair<>(3.0, 25.4);
+        //CustomPair<CustomPair<?, ?>, CustomPair<?, ?>> obs = new CustomPair<>(p1, p2);
+        Model2D modelBox = box.getModel();
+
+    }
+
     public void manipulationOccured(ManipulationEvent e) {
         Object target = e.getTarget();
         switch (e.getType()) {
+            case ManipulationEvent.CUSTOM_MODEL_PAUSE:
+                int reward = 0;
+                System.out.println("CUSTOM MANIPULATION HAPPENED");
+                System.out.println("rida 769");
+                Model2D modelBox = box.getModel();
+
+                // Get action
+                double key = env.getInsideTemp();
+                double[] _actions = qTable.get(key);
+                int calculatedAction;
+                if (Math.random() > epsilon) {
+                    calculatedAction = findArgmax(_actions);
+                } else {
+                    calculatedAction = (int)(Math.random() * (2 + 1));
+                }
+                int wantedAction = getCorrectAction(env);
+
+                // Take action
+                env.takeAction(calculatedAction);
+                Thermostat thermostat = modelBox.getThermostats().get(0);
+                if (calculatedAction == env.HEAT) {
+                    thermostat.getPowerSource().setPower(200);
+                } else if (calculatedAction == env.STOP_HEATING) {
+                    thermostat.getPowerSource().setPower(0.000001f);
+                }
+
+                // Calculate episode rewards
+                if (wantedAction == calculatedAction) {
+                    reward += CORRECT_HEATING_REWARD;
+                    correct += 1;
+                } else {
+                    reward += INCORRECT_HEATING_PENALTY;
+                    incorrect += 1;
+                }
+
+                // Calculate qTable values
+                double obs2 = env.getInsideTemp();
+                double maxFutureQValue = findMax(qTable.get(obs2));
+                double currentQ = qTable.get(obs2)[calculatedAction];
+                double newQ;
+                if (reward == CORRECT_HEATING_REWARD) {
+                    newQ = CORRECT_HEATING_REWARD;
+                } else {
+                    newQ = (1 - LEARNING_RATE) * currentQ + LEARNING_RATE * (reward + DISCOUNT * maxFutureQValue);
+                }
+
+
+
+
+                modelBox.run();
+            case ManipulationEvent.CUSTOM_MODEL_RESET:
+                System.out.println("reset");
+                Model2D modelBox2 = box.getModel();
+                modelBox2.reset();
+                modelBox2.run();
             case ManipulationEvent.REPAINT:
                 view.repaint();
                 break;
@@ -970,240 +1129,16 @@ public class System2D extends JApplet implements ManipulationListener {
         }
     }
 
-
-    private static final int CORRECT_HEATING_REWARD = 100;
-    private static final int INCORRECT_HEATING_PENALTY = -400;
-    private static final double EPS_DECAY = 0.9998;
-    private static final double LEARNING_RATE = 0.1;
-    private static final double DISCOUNT = 0.95;
-
-    private static int findArgmax(double[] array) {
-        float max = -2000000000;
-        int index = 0;
-        for (int i = 0 ; i < array.length ; i++) {
-            if (array[i] > max) {
-                max = i;
-                index = i;
-            }
-        } return index;
-    }
-
-    private static double findMax(double[] array) {
-        double max = -2000000000;
-        for (double i : array) {
-            if (i > max) {
-                max = i;
-            }
-        } return max;
-    }
-
-    private static int getCorrectAction(Environment env) {
-        boolean isHeating = env.isHeating();
-        boolean isHumanPresence = env.isHumanPresence();
-        double outsideTemp = env.getOutsideTemp();
-        double insideTemp = env.getInsideTemp();
-
-        int correctAction = env.DO_NOTHING;
-
-        /*if (!isHumanPresence) {
-            if (isHeating) {
-                correctAction = env.STOP_HEATING;
-            }
-        } else {
-            if (isHeating) {
-                if (insideTemp >= outsideTemp & insideTemp >= 20) {
-                    correctAction = env.STOP_HEATING;
-                } else {
-                    if (outsideTemp >= 20) {
-                        correctAction = env.STOP_HEATING;
-                    } else {
-                        correctAction = env.HEAT;
-                    }
-                }
-            } else {
-                if (insideTemp < 20) {
-                    if (outsideTemp < 20) {
-                        correctAction = env.HEAT;
-                    } else {
-                        correctAction = env.STOP_HEATING;
-                    }
-                }
-            }
-        }*/
-        if (!isHumanPresence) {
-            if (isHeating) {
-                correctAction = env.STOP_HEATING;
-            }
-        } else {
-            if (isHeating) {
-                if (insideTemp >= 20) {
-                    correctAction = env.STOP_HEATING;
-                } else {
-                    correctAction = env.HEAT;
-                }
-            } else {
-                if (insideTemp < 20) {
-                    correctAction = env.HEAT;
-                }
-                else {
-                    correctAction = env.STOP_HEATING;
-                }
-            }
-        }
-        return correctAction;
-    }
-
-    private static void setupSimulation() {
-        Model2D modelBox = box.getModel();
-        box.loadModel("examples/thermostat.e2d");
-        modelBox.setTimeStep(10f);
-        modelBox.getThermostats().get(0).setDeadband(100000f);
-    }
-
-    private static void startSimulation() {
-        View2D viewBox = box.getView();
-        viewBox.notifyManipulationListeners(null, ManipulationEvent.RUN);
-    }
-    /*
-     float thermostat0Power = thermostat0.getPowerSource().getPower();
-     thermostat0.getPowerSource().setPower(0.000001f);
-     thermostat0.getPowerSource().setPower(thermostat0Power);
-     */
-    public static double round(float value, int places) {
-        if (places < 0) throw new IllegalArgumentException();
-        BigDecimal bd = BigDecimal.valueOf(value);
-        bd = bd.setScale(places, RoundingMode.HALF_UP);
-        return bd.doubleValue();
-    }
-
-
-    // ca 4 sekundiga läbib 24h (kui timestep 10f). töötab 5 minutise kontrolliga, kui muid protsesse samal ajal ei käi
-    private static void afterStartSimulation() {
-        QLearningModel qLearningModel = new QLearningModel();
-        //HashMap<CustomPair<CustomPair<Boolean, Boolean>, CustomPair<Double, Double>>, double[]> qTable = qLearningModel.getqTable();
-        HashMap<Double, double[]> qTable = qLearningModel.getqTable();
-
-        //CustomPair<Boolean, Boolean> p1 = new CustomPair<>(true, true);
-        //CustomPair<Double, Double> p2 = new CustomPair<>(3.0, 25.4);
-        //CustomPair<CustomPair<?, ?>, CustomPair<?, ?>> obs = new CustomPair<>(p1, p2);
-        Model2D modelBox = box.getModel();
-
-        java.util.Timer timer = new java.util.Timer();
-        DecimalFormat f = new DecimalFormat("##.0");
-
-
-        TimerTask task = new TimerTask() {
-            int previousModelBoxTimestampInMinutes = 0;
-            Environment env = null;
-            double epsilon = 0.9;
-            int episodeReward = 0;
-            ArrayList<Integer> episodeRewards = new ArrayList<>();
-            @Override
-            public void run() {
-                int modelBoxTime = (int) (modelBox.getTime() / 60);
-                // 24H = 1440min = 1 episode
-                // 1440 min = 288 loops
-                if (modelBoxTime == 0 || env == null) {
-                    env = new Environment(0f, 0f);
-                    epsilon *= EPS_DECAY;
-                    episodeRewards.add(episodeReward);
-                    episodeReward = 0;
-
-                    // set environment values based on model
-                    //System.out.println(modelBox.getThermometers().get(0).getCurrentData());
-                    double insideTemp = round(0, 1);
-                    double outsideTemp = round(0, 1);
-                    env.setInsideTemp(insideTemp);
-                    env.setOutsideTemp(outsideTemp);
-                }
-                // If 5 minutes have passed or day is about to be over
-                if (modelBoxTime >= previousModelBoxTimestampInMinutes + 5 & modelBoxTime <= 1440) {
-                    double insideTemp = round(modelBox.getThermometers().get(0).getCurrentData(), 1);
-                    double outsideTemp = round(modelBox.getBackgroundTemperature(), 1);
-                    env.setInsideTemp(insideTemp);
-                    env.setOutsideTemp(outsideTemp);
-
-                    //CustomPair<Boolean, Boolean> p1 = new CustomPair<>(env.isHeating(), env.isHumanPresence());
-                    //CustomPair<Double, Double> p2 = new CustomPair<>(env.getOutsideTemp(), env.getInsideTemp());
-                    //CustomPair<CustomPair<Boolean, Boolean>, CustomPair<Double, Double>> obs = new CustomPair<>(p1, p2);
-                    Double obs = env.getInsideTemp();
-
-                    // get action randomly or based on q table
-                    double[] _actions = qTable.get(obs);
-                    int calculatedAction;
-                    if (Math.random() > epsilon) {
-                        calculatedAction = findArgmax(_actions);
-                    } else {
-                        calculatedAction = (int)(Math.random() * (env.getActionSpace().length - 1) + 1);
-                    }
-                    // find what action was wanted and do calculated action
-                    int wantedAction = getCorrectAction(env);
-                    env.takeAction(calculatedAction);
-                    Thermostat thermostat =  modelBox.getThermostats().get(0);
-                    if (calculatedAction == env.HEAT) {
-                        thermostat.getPowerSource().setPower(0.000001f);
-                    } else if (calculatedAction == env.STOP_HEATING) {
-                        thermostat.getPowerSource().setPower(200);
-                    }
-
-                    // calculate reward based on calculated and wanted action
-                    int reward;
-                    if (wantedAction == calculatedAction) {
-                        reward = CORRECT_HEATING_REWARD;
-                    } else {
-                        reward = INCORRECT_HEATING_PENALTY;
-                    }
-
-                    // find new observation space
-                    //CustomPair<Boolean, Boolean> np1 = new CustomPair<>(env.isHeating(), env.isHumanPresence());
-                    //CustomPair<Double, Double> np2 = new CustomPair<>(env.getOutsideTemp(), env.getInsideTemp());
-                    //CustomPair<CustomPair<Boolean, Boolean>, CustomPair<Double, Double>> nObs = new CustomPair<>(np1, np2);
-                    Double nObs = env.getInsideTemp();
-                    double maxFutureQValue;
-                    maxFutureQValue = findMax(qTable.get(nObs));
-
-                    double currentQ = qTable.get(obs)[calculatedAction];
-                    double newQ;
-                    if (reward == CORRECT_HEATING_REWARD) {
-                        newQ = CORRECT_HEATING_REWARD;
-                    } else {
-                        newQ = (1-LEARNING_RATE) * currentQ + LEARNING_RATE * (episodeReward + DISCOUNT * maxFutureQValue);
-                    }
-                    _actions[calculatedAction] = newQ;
-                    qTable.put(obs, _actions);
-                    episodeReward += reward;
-
-                    previousModelBoxTimestampInMinutes = modelBoxTime;
-                    System.out.println(modelBoxTime);
-                    if (modelBoxTime >= 1440) {
-                        View2D viewBox = box.getView();
-                        viewBox.notifyManipulationListeners(null, ManipulationEvent.RESET);
-                        previousModelBoxTimestampInMinutes = 0;
-                        //viewBox.notifyManipulationListeners(null, ManipulationEvent.RUN);
-                    }
-                }
-                if (modelBoxTime >= 1440) {
-                    View2D viewBox = box.getView();
-                    viewBox.notifyManipulationListeners(null, ManipulationEvent.RESET);
-                    previousModelBoxTimestampInMinutes = 0;
-                    viewBox.notifyManipulationListeners(null, ManipulationEvent.RUN);
-                }
-            }
-        };
-        timer.schedule(task, 0L, 1000);
-    }
-
     public static void main(final String[] args) {
         EventQueue.invokeLater(() -> {
             start(args);
             setupSimulation();
 
-
             EventQueue.invokeLater(() -> {
                 startSimulation();
-                EventQueue.invokeLater(() -> {
+                /*EventQueue.invokeLater(() -> {
                     afterStartSimulation();
-                });
+                });*/
             });
             //Updater.download(box);
         });

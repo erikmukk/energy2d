@@ -1650,6 +1650,15 @@ public class Model2D {
             running = true;
             while (running) {
                 nextStep();
+                if (getTime() > 21600) {
+                    stop();
+                    notifyManipulationListeners(ManipulationEvent.CUSTOM_MODEL_RESET);
+                }
+                if (getTime() % 1800 == 0) {
+                    stop();
+                    notifyManipulationListeners(ManipulationEvent.CUSTOM_MODEL_PAUSE);
+                }
+
                 if (fatalErrorOccurred()) {
                     notifyManipulationListeners(ManipulationEvent.STOP);
                     notifyManipulationListeners(ManipulationEvent.FATAL_ERROR_OCCURRED);
