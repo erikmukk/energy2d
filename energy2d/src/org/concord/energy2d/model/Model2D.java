@@ -6,12 +6,9 @@ import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.ListIterator;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.*;
 
 import org.concord.energy2d.event.ManipulationEvent;
 import org.concord.energy2d.event.ManipulationListener;
@@ -19,6 +16,7 @@ import org.concord.energy2d.math.Annulus;
 import org.concord.energy2d.math.Blob2D;
 import org.concord.energy2d.math.EllipticalAnnulus;
 import org.concord.energy2d.math.Polygon2D;
+import qlearning.Environment;
 
 /**
  * Units:
@@ -1642,6 +1640,85 @@ public class Model2D {
         clearSensorData();
     }
 
+    static float outsideInitTemp = 0;
+    static float insideInitTemp = 0;
+
+    public static void setqTable(HashMap<Double, double[]> qTable) {
+        Model2D.qTable = qTable;
+    }
+
+    static HashMap<Double, double[]> qTable;
+    static Environment env = new Environment(outsideInitTemp, insideInitTemp);
+    static float episodeReward = 0;
+
+    private static final int CORRECT_HEATING_REWARD = 100;
+    private static final int INCORRECT_HEATING_PENALTY = -400;
+    private static final double EPS_DECAY = 0.9998;
+    private static final double LEARNING_RATE = 0.1;
+    private static final double DISCOUNT = 0.95;
+    static double epsilon = 0.9;
+    static int correct = 0;
+    static int incorrect = 0;
+    static int loops = 0;
+
+    public static double round(float value, int places) {
+        if (places < 0) throw new IllegalArgumentException();
+        BigDecimal bd = BigDecimal.valueOf(value);
+        bd = bd.setScale(places, RoundingMode.HALF_UP);
+        return bd.doubleValue();
+    }
+
+    private static int findArgmax(double[] array) {
+        float max = -2000000000;
+        int index = 0;
+        for (int i = 0 ; i < array.length ; i++) {
+            if (array[i] > max) {
+                max = i;
+                index = i;
+            }
+        } return index;
+    }
+
+    private static double findMax(double[] array) {
+        double max = -2000000000;
+        for (double i : array) {
+            if (i > max) {
+                max = i;
+            }
+        } return max;
+    }
+
+    private static int getCorrectAction(Environment env) {
+        boolean isHeating = env.isHeating();
+        boolean isHumanPresence = env.isHumanPresence();
+        double outsideTemp = env.getOutsideTemp();
+        double insideTemp = env.getInsideTemp();
+
+        int correctAction = env.DO_NOTHING;
+
+        if (!isHumanPresence) {
+            if (isHeating) {
+                correctAction = env.STOP_HEATING;
+            }
+        } else {
+            if (isHeating) {
+                if (insideTemp >= 20) {
+                    correctAction = env.STOP_HEATING;
+                } else {
+                    correctAction = env.HEAT;
+                }
+            } else {
+                if (insideTemp < 20) {
+                    correctAction = env.HEAT;
+                }
+                else {
+                    correctAction = env.STOP_HEATING;
+                }
+            }
+        }
+        return correctAction;
+    }
+
     public void run() {
         checkPartPower();
         checkPartRadiation();
@@ -1650,13 +1727,66 @@ public class Model2D {
             running = true;
             while (running) {
                 nextStep();
-                if (getTime() > 21600) {
+                if (getTime() > 43200) {
                     stop();
-                    notifyManipulationListeners(ManipulationEvent.CUSTOM_MODEL_RESET);
+                    reset();
+                    //notifyManipulationListeners(ManipulationEvent.RESET);
+                    //notifyManipulationListeners(ManipulationEvent.CUSTOM_MODEL_RESET);
+                    epsilon = epsilon * EPS_DECAY;
+                    loops += 1;
+                    System.out.println("correct: " + correct + "\tincorrect: " + incorrect + "\tloops: " + loops);
+                    run();
                 }
                 if (getTime() % 1800 == 0) {
                     stop();
-                    notifyManipulationListeners(ManipulationEvent.CUSTOM_MODEL_PAUSE);
+                    //notifyManipulationListeners(ManipulationEvent.CUSTOM_MODEL_PAUSE);
+                    int reward = 0;
+                    // Get action
+                    double key = env.getInsideTemp();
+                    double[] _actions = qTable.get(key);
+                    int calculatedAction;
+                    if (Math.random() > epsilon) {
+                        calculatedAction = findArgmax(_actions);
+                    } else {
+                        calculatedAction = (int)(Math.random() * (2 + 1));
+                    }
+                    int wantedAction = getCorrectAction(env);
+
+                    // Take action
+                    env.takeAction(calculatedAction);
+
+                    Thermostat thermostat = this.getThermostats().get(0);
+                    if (calculatedAction == env.HEAT) {
+                        thermostat.getPowerSource().setPowerSwitch(true);
+                    } else if (calculatedAction == env.STOP_HEATING) {
+                        thermostat.getPowerSource().setPowerSwitch(false);
+                    }
+
+                    // Calculate episode rewards
+                    if (wantedAction == calculatedAction) {
+                        reward += CORRECT_HEATING_REWARD;
+                        correct += 1;
+                    } else {
+                        reward += INCORRECT_HEATING_PENALTY;
+                        incorrect += 1;
+                    }
+
+                    // Calculate qTable values
+                    double obs2 = env.getInsideTemp();
+                    double maxFutureQValue = findMax(qTable.get(obs2));
+                    double currentQ = qTable.get(obs2)[calculatedAction];
+                    double newQ;
+                    if (reward == CORRECT_HEATING_REWARD) {
+                        newQ = CORRECT_HEATING_REWARD;
+                    } else {
+                        newQ = (1 - LEARNING_RATE) * currentQ + LEARNING_RATE * (reward + DISCOUNT * maxFutureQValue);
+                    }
+                    // Set new qTable values
+                    double[] tempValues = qTable.get(obs2);
+                    tempValues[calculatedAction] = newQ;
+                    qTable.put(obs2, tempValues);
+                    episodeReward += reward;
+                    run();
                 }
 
                 if (fatalErrorOccurred()) {
