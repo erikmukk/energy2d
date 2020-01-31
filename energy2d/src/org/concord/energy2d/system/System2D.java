@@ -660,30 +660,6 @@ public class System2D extends JApplet implements ManipulationListener {
         return scripter;
     }
 
-    private static void setupSimulation() {
-        Model2D modelBox = box.getModel();
-        box.loadModel("examples/thermostat.e2d");
-        modelBox.setTimeStep(10f);
-        modelBox.getThermostats().get(0).setDeadband(10000f);
-        HashMap<Double, double[]> qTable = new HashMap<>();
-        for ( float i = -50 ; i <= 50.1f ; i+=0.1f) {
-            qTable.put(round(i, 1), new double[]{0, 0, 0});
-        }
-        modelBox.setqTable(qTable);
-    }
-
-    private static void startSimulation() {
-        View2D viewBox = box.getView();
-        viewBox.notifyManipulationListeners(null, ManipulationEvent.RUN);
-    }
-
-    public static double round(float value, int places) {
-        if (places < 0) throw new IllegalArgumentException();
-        BigDecimal bd = BigDecimal.valueOf(value);
-        bd = bd.setScale(places, RoundingMode.HALF_UP);
-        return bd.doubleValue();
-    }
-
     public void manipulationOccured(ManipulationEvent e) {
         Object target = e.getTarget();
         switch (e.getType()) {
@@ -992,6 +968,31 @@ public class System2D extends JApplet implements ManipulationListener {
         } catch (final Throwable t) {
             t.printStackTrace();
         }
+    }
+
+
+    private static void setupSimulation() {
+        Model2D modelBox = box.getModel();
+        box.loadModel("examples/thermostat.e2d");
+        modelBox.setTimeStep(10f);
+        modelBox.getThermostats().get(0).setDeadband(10000f);
+        HashMap<Double, double[]> qTable = new HashMap<>();
+        for ( float i = -50 ; i <= 50.1f ; i+=0.1f) {
+            qTable.put(round(i, 1), new double[]{0, 0, 0});
+        }
+        modelBox.setqTable(qTable);
+    }
+
+    private static void startSimulation() {
+        View2D viewBox = box.getView();
+        viewBox.notifyManipulationListeners(null, ManipulationEvent.RUN);
+    }
+
+    public static double round(float value, int places) {
+        if (places < 0) throw new IllegalArgumentException();
+        BigDecimal bd = BigDecimal.valueOf(value);
+        bd = bd.setScale(places, RoundingMode.HALF_UP);
+        return bd.doubleValue();
     }
 
     public static void main(final String[] args) {

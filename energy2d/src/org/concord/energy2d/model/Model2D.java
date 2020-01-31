@@ -1742,8 +1742,8 @@ public class Model2D {
                     //notifyManipulationListeners(ManipulationEvent.CUSTOM_MODEL_PAUSE);
                     int reward = 0;
                     // Get action
-                    double key = env.getInsideTemp();
-                    double[] _actions = qTable.get(key);
+                    double obs = env.getInsideTemp();
+                    double[] _actions = qTable.get(obs);
                     int calculatedAction;
                     if (Math.random() > epsilon) {
                         calculatedAction = findArgmax(_actions);
