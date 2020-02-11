@@ -1017,6 +1017,13 @@ class MenuBar extends JMenuBar {
         examples.put("Thermoregulation", "examples/thermoregulation.e2d");
         createMenu(box, subMenu, examples);
 
+        subMenu = new JMenu("QLearning");
+        menu.add(subMenu);
+
+        examples.put("Only inside thermostat", "examples/thermostat.e2d");
+        examples.put("Inside thermostat + outside thermometer", "examples/test-heating-sun-2.e2d");
+        createMenu(box, subMenu, examples);
+
         menu.addSeparator();
         mi = new JMenuItem("More...");
         mi.setToolTipText("Open the Online Model Repository");

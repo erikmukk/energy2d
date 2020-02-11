@@ -1643,11 +1643,11 @@ public class Model2D {
     static float outsideInitTemp = 0;
     static float insideInitTemp = 0;
 
-    public static void setqTable(Map<Double, double[]> qTable) {
+    public void setqTable(Map<Double, Map<Double, double[]>> qTable) {
         Model2D.qTable = qTable;
     }
 
-    static Map<Double, double[]> qTable;
+    static Map<Double, Map<Double, double[]>> qTable;
     static Environment env = new Environment(outsideInitTemp, insideInitTemp);
     static float episodeReward = 0;
 
@@ -1693,10 +1693,12 @@ public class Model2D {
         boolean isHumanPresence = env.isHumanPresence();
         double outsideTemp = env.getOutsideTemp();
         double insideTemp = env.getInsideTemp();
+        double targetTemp = env.getTargetTemp();
+        double deadband = env.getDeadband();
 
         int correctAction = env.DO_NOTHING;
 
-        if (!isHumanPresence) {
+        /*if (!isHumanPresence) {
             if (isHeating) {
                 correctAction = env.STOP_HEATING;
             }
@@ -1712,6 +1714,34 @@ public class Model2D {
                     correctAction = env.HEAT;
                 }
                 else {
+                    correctAction = env.STOP_HEATING;
+                }
+            }
+        }*/
+        if (isHeating) {
+            if (insideTemp >= targetTemp + deadband) {
+                correctAction = env.STOP_HEATING;
+            } else {
+                if (insideTemp >= outsideTemp & outsideTemp >= targetTemp) {
+                    correctAction = env.STOP_HEATING;
+                } else {
+                    if (insideTemp < targetTemp + deadband) {
+                        correctAction = env.HEAT;
+                    }
+                }
+            }
+        } else {
+            if (outsideTemp < insideTemp) {
+                if (insideTemp < targetTemp) {
+                    correctAction = env.HEAT;
+                } else {
+                    if (insideTemp >= targetTemp + deadband) {
+                        correctAction = env.STOP_HEATING;
+                    }
+                }
+            }
+            else {
+                if (insideTemp >= targetTemp + deadband) {
                     correctAction = env.STOP_HEATING;
                 }
             }
@@ -1735,16 +1765,21 @@ public class Model2D {
 
         // Modify env to match model temp
         // TODO: Minigil põhjusel tuleb siin NaN vahepeal. Seda peab kindlasti uurima!!! Preagune on band-aid fix
-        Thermostat thermostat = this.getThermostats().get(0);
+        Thermostat heaterThermostat = this.getThermostats().get(0);
+        Thermometer insideThermometer = heaterThermostat.getThermometer();
+        Thermometer outsideThermometer = this.getThermometer("outside");
         try {
-            env.setInsideTemp(round(thermostat.getThermometer().getCurrentData(), 1));
+            env.setInsideTemp(round(insideThermometer.getCurrentData(), 1));
+            env.setOutsideTemp(round(outsideThermometer.getCurrentData(), 1));
         } catch (Exception e) {
             env.setInsideTemp(round(0, 1));
+            env.setOutsideTemp(round(0, 1));
         }
 
         // Get action
-        double obs = env.getInsideTemp();
-        double[] _actions = qTable.get(obs);
+        double insideTemp = env.getInsideTemp();
+        double outsideTemp = env.getOutsideTemp();
+        double[] _actions = qTable.get(insideTemp).get(outsideTemp);
         int calculatedAction;
         if (Math.random() > epsilon) {
             calculatedAction = findArgmax(_actions);
@@ -1757,9 +1792,9 @@ public class Model2D {
         env.takeAction(calculatedAction);
 
         if (calculatedAction == env.HEAT) {
-            thermostat.getPowerSource().setPowerSwitch(true);
+            heaterThermostat.getPowerSource().setPowerSwitch(true);
         } else if (calculatedAction == env.STOP_HEATING) {
-            thermostat.getPowerSource().setPowerSwitch(false);
+            heaterThermostat.getPowerSource().setPowerSwitch(false);
         }
 
         // Calculate episode rewards
@@ -1772,9 +1807,10 @@ public class Model2D {
         }
 
         // Calculate qTable values
-        double obs2 = env.getInsideTemp();
-        double maxFutureQValue = findMax(qTable.get(obs2));
-        double currentQ = qTable.get(obs2)[calculatedAction];
+        double insideTemp2 = env.getInsideTemp();
+        double outsideTemp2 = env.getOutsideTemp();
+        double maxFutureQValue = findMax(qTable.get(insideTemp2).get(outsideTemp2));
+        double currentQ = qTable.get(insideTemp2).get(outsideTemp2)[calculatedAction];
         double newQ;
         if (reward == CORRECT_HEATING_REWARD) {
             newQ = CORRECT_HEATING_REWARD;
@@ -1782,9 +1818,11 @@ public class Model2D {
             newQ = (1 - LEARNING_RATE) * currentQ + LEARNING_RATE * (reward + DISCOUNT * maxFutureQValue);
         }
         // Set new qTable values
-        double[] tempValues = qTable.get(obs2);
+        double[] tempValues = qTable.get(insideTemp2).get(outsideTemp2);
         tempValues[calculatedAction] = newQ;
-        qTable.put(obs2, tempValues);
+        Map<Double, double[]> previous = qTable.get(insideTemp2);
+        previous.put(outsideTemp2, tempValues);
+        qTable.put(insideTemp2, previous);
         episodeReward += reward;
         notifyManipulationListeners(ManipulationEvent.RUN);
     }
@@ -1797,7 +1835,7 @@ public class Model2D {
             running = true;
             while (running) {
                 nextStep();
-                if (getTime() > 432000000) {
+                if (getTime() > 86400) {
                     doWhenIterationEnds();
                 }
                 if (getTime() % 1800 == 0) {

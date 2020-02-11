@@ -8,8 +8,19 @@ public class Environment {
     double insideTemp;
     double outsideTemp;
     boolean isHeating;
+    double targetTemp = 22;
+    double deadband = 2;
     public final int DO_NOTHING = 0;
     public final int HEAT = 1;
+
+    public double getTargetTemp() {
+        return targetTemp;
+    }
+
+    public double getDeadband() {
+        return deadband;
+    }
+
     public final int STOP_HEATING = 2;
     private final int[] actionSpace = new int[]{HEAT, STOP_HEATING, DO_NOTHING};
 

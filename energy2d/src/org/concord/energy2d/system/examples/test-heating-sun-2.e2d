@@ -7,7 +7,7 @@
 <tasks>
 <task uid="MOVE_SUN" script="set sunny true;-linebreak-movesun;" description="Move the sun." interval="100"/>
 </tasks>
-<sunny>true</sunny><sun_angle>-0.05817747</sun_angle>
+<sunny>true</sunny><sun_angle>-0.55268764</sun_angle>
 <solar_power_density>15000.0</solar_power_density>
 <solar_ray_count>24</solar_ray_count>
 <solar_ray_speed>0.005</solar_ray_speed>
@@ -34,9 +34,9 @@
 <emissivity>0.0</emissivity>
 <temperature>0.0</temperature>
 <constant_temperature>false</constant_temperature>
-<texture><texture_fg>-1000000</texture_fg>
-<texture_bg>-7f7f80</texture_bg>
-<texture_style>9</texture_style>
+<texture><texture_fg>-7f7f80</texture_fg>
+<texture_bg>-cccccd</texture_bg>
+<texture_style>16</texture_style>
 <texture_width>12</texture_width>
 <texture_height>12</texture_height>
 </texture>
@@ -56,10 +56,16 @@
 <emissivity>0.0</emissivity>
 <temperature>0.0</temperature>
 <constant_temperature>false</constant_temperature>
+<texture><texture_fg>-1000000</texture_fg>
+<texture_bg>-7f7f80</texture_bg>
+<texture_style>12</texture_style>
+<texture_width>12</texture_width>
+<texture_height>12</texture_height>
+</texture>
 <label>A</label>
 </part>
 <part>
-<polygon count="5" vertices="9.18, 4.08, 0.87999976, 4.08, 0.87999976, 3.38, 4.98, 1.0799999, 9.08, 3.38"/>
+<polygon count="5" vertices="0.5, 4.0, 0.5, 3.5, 5.0, 1.0, 9.5, 3.5, 9.5, 4.0"/>
 <elasticity>1.0</elasticity>
 <thermal_conductivity>0.001</thermal_conductivity>
 <specific_heat>1300.0</specific_heat>
@@ -67,12 +73,18 @@
 <transmission>0.0</transmission>
 <reflection>0.0</reflection>
 <scattering>false</scattering>
-<scattering_visible>false</scattering_visible>
 <absorption>1.0</absorption>
 <emissivity>0.0</emissivity>
 <temperature>0.0</temperature>
 <constant_temperature>false</constant_temperature>
+<texture><texture_fg>-1000000</texture_fg>
+<texture_bg>-7f7f80</texture_bg>
+<texture_style>7</texture_style>
+<texture_width>4</texture_width>
+<texture_height>4</texture_height>
+</texture>
 <label>Roof</label>
+<draggable>false</draggable>
 </part>
 <part>
 <rectangle x="1.0" y="7.0" width="0.5" height="1.0"/><elasticity>1.0</elasticity>
@@ -87,6 +99,12 @@
 <emissivity>0.0</emissivity>
 <temperature>0.0</temperature>
 <constant_temperature>false</constant_temperature>
+<texture><texture_fg>-1000000</texture_fg>
+<texture_bg>-7f7f80</texture_bg>
+<texture_style>12</texture_style>
+<texture_width>12</texture_width>
+<texture_height>12</texture_height>
+</texture>
 <label>C</label>
 </part>
 <part>
@@ -102,6 +120,12 @@
 <emissivity>0.0</emissivity>
 <temperature>0.0</temperature>
 <constant_temperature>false</constant_temperature>
+<texture><texture_fg>-1000000</texture_fg>
+<texture_bg>-7f7f80</texture_bg>
+<texture_style>12</texture_style>
+<texture_width>12</texture_width>
+<texture_height>12</texture_height>
+</texture>
 <label>B</label>
 </part>
 <part>
@@ -117,6 +141,7 @@
 <emissivity>0.0</emissivity>
 <temperature>0.0</temperature>
 <constant_temperature>false</constant_temperature>
+<color>ffffff</color>
 <label>Window</label>
 </part>
 <part>
@@ -140,10 +165,10 @@
 </environment>
 <sensor>
 <thermometer uid="T2" label="Thermostat" x="8.013" y="5.782"/>
-<thermometer x="8.2" y="1.2"/>
+<thermometer uid="outside" x="8.2" y="1.1999998"/>
 </sensor>
 <controller>
-<thermostat set_point="20.0" deadband="1.0" thermometer="T2" power_source="HEATER"/>
+<thermostat set_point="20.0" deadband="10000.0" thermometer="T2" power_source="HEATER"/>
 </controller>
 </model>
 <view>
