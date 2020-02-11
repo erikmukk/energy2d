@@ -1643,11 +1643,11 @@ public class Model2D {
     static float outsideInitTemp = 0;
     static float insideInitTemp = 0;
 
-    public static void setqTable(HashMap<Double, double[]> qTable) {
+    public static void setqTable(Map<Double, double[]> qTable) {
         Model2D.qTable = qTable;
     }
 
-    static HashMap<Double, double[]> qTable;
+    static Map<Double, double[]> qTable;
     static Environment env = new Environment(outsideInitTemp, insideInitTemp);
     static float episodeReward = 0;
 
@@ -1719,6 +1719,76 @@ public class Model2D {
         return correctAction;
     }
 
+    private void doWhenIterationEnds() {
+        stop();
+        reset();
+        epsilon = epsilon * EPS_DECAY;
+        loops += 1;
+        System.out.println("correct: " + correct + "\tincorrect: " + incorrect + "\tloops: " + loops);
+        env = new Environment(outsideInitTemp, insideInitTemp);
+        notifyManipulationListeners(ManipulationEvent.RUN);
+    }
+
+    private void doWhenTimestepEnds() {
+        stop();
+        int reward = 0;
+
+        // Modify env to match model temp
+        // TODO: Minigil põhjusel tuleb siin NaN vahepeal. Seda peab kindlasti uurima!!! Preagune on band-aid fix
+        Thermostat thermostat = this.getThermostats().get(0);
+        try {
+            env.setInsideTemp(round(thermostat.getThermometer().getCurrentData(), 1));
+        } catch (Exception e) {
+            env.setInsideTemp(round(0, 1));
+        }
+
+        // Get action
+        double obs = env.getInsideTemp();
+        double[] _actions = qTable.get(obs);
+        int calculatedAction;
+        if (Math.random() > epsilon) {
+            calculatedAction = findArgmax(_actions);
+        } else {
+            calculatedAction = (int)(Math.random() * (2 + 1));
+        }
+        int wantedAction = getCorrectAction(env);
+
+        // Take action
+        env.takeAction(calculatedAction);
+
+        if (calculatedAction == env.HEAT) {
+            thermostat.getPowerSource().setPowerSwitch(true);
+        } else if (calculatedAction == env.STOP_HEATING) {
+            thermostat.getPowerSource().setPowerSwitch(false);
+        }
+
+        // Calculate episode rewards
+        if (wantedAction == calculatedAction) {
+            reward += CORRECT_HEATING_REWARD;
+            correct += 1;
+        } else {
+            reward += INCORRECT_HEATING_PENALTY;
+            incorrect += 1;
+        }
+
+        // Calculate qTable values
+        double obs2 = env.getInsideTemp();
+        double maxFutureQValue = findMax(qTable.get(obs2));
+        double currentQ = qTable.get(obs2)[calculatedAction];
+        double newQ;
+        if (reward == CORRECT_HEATING_REWARD) {
+            newQ = CORRECT_HEATING_REWARD;
+        } else {
+            newQ = (1 - LEARNING_RATE) * currentQ + LEARNING_RATE * (reward + DISCOUNT * maxFutureQValue);
+        }
+        // Set new qTable values
+        double[] tempValues = qTable.get(obs2);
+        tempValues[calculatedAction] = newQ;
+        qTable.put(obs2, tempValues);
+        episodeReward += reward;
+        notifyManipulationListeners(ManipulationEvent.RUN);
+    }
+
     public void run() {
         checkPartPower();
         checkPartRadiation();
@@ -1727,66 +1797,11 @@ public class Model2D {
             running = true;
             while (running) {
                 nextStep();
-                if (getTime() > 43200) {
-                    stop();
-                    reset();
-                    //notifyManipulationListeners(ManipulationEvent.RESET);
-                    //notifyManipulationListeners(ManipulationEvent.CUSTOM_MODEL_RESET);
-                    epsilon = epsilon * EPS_DECAY;
-                    loops += 1;
-                    System.out.println("correct: " + correct + "\tincorrect: " + incorrect + "\tloops: " + loops);
-                    run();
+                if (getTime() > 432000000) {
+                    doWhenIterationEnds();
                 }
                 if (getTime() % 1800 == 0) {
-                    stop();
-                    //notifyManipulationListeners(ManipulationEvent.CUSTOM_MODEL_PAUSE);
-                    int reward = 0;
-                    // Get action
-                    double obs = env.getInsideTemp();
-                    double[] _actions = qTable.get(obs);
-                    int calculatedAction;
-                    if (Math.random() > epsilon) {
-                        calculatedAction = findArgmax(_actions);
-                    } else {
-                        calculatedAction = (int)(Math.random() * (2 + 1));
-                    }
-                    int wantedAction = getCorrectAction(env);
-
-                    // Take action
-                    env.takeAction(calculatedAction);
-
-                    Thermostat thermostat = this.getThermostats().get(0);
-                    if (calculatedAction == env.HEAT) {
-                        thermostat.getPowerSource().setPowerSwitch(true);
-                    } else if (calculatedAction == env.STOP_HEATING) {
-                        thermostat.getPowerSource().setPowerSwitch(false);
-                    }
-
-                    // Calculate episode rewards
-                    if (wantedAction == calculatedAction) {
-                        reward += CORRECT_HEATING_REWARD;
-                        correct += 1;
-                    } else {
-                        reward += INCORRECT_HEATING_PENALTY;
-                        incorrect += 1;
-                    }
-
-                    // Calculate qTable values
-                    double obs2 = env.getInsideTemp();
-                    double maxFutureQValue = findMax(qTable.get(obs2));
-                    double currentQ = qTable.get(obs2)[calculatedAction];
-                    double newQ;
-                    if (reward == CORRECT_HEATING_REWARD) {
-                        newQ = CORRECT_HEATING_REWARD;
-                    } else {
-                        newQ = (1 - LEARNING_RATE) * currentQ + LEARNING_RATE * (reward + DISCOUNT * maxFutureQValue);
-                    }
-                    // Set new qTable values
-                    double[] tempValues = qTable.get(obs2);
-                    tempValues[calculatedAction] = newQ;
-                    qTable.put(obs2, tempValues);
-                    episodeReward += reward;
-                    run();
+                    doWhenTimestepEnds();
                 }
 
                 if (fatalErrorOccurred()) {

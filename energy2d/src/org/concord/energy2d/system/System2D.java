@@ -130,7 +130,6 @@ public class System2D extends JApplet implements ManipulationListener {
         addPropertyChangeListener(view);
         model.addPropertyChangeListener(view);
         getContentPane().add(view, BorderLayout.CENTER);
-
         encoder = new XmlEncoder(this);
         saxHandler = new XmlDecoder(this);
         try {
@@ -160,6 +159,7 @@ public class System2D extends JApplet implements ManipulationListener {
         };
         model.setTasks(this::run2);
         createTasks();
+        //view.setVisible(false);
 
     }
 
@@ -976,8 +976,8 @@ public class System2D extends JApplet implements ManipulationListener {
         box.loadModel("examples/thermostat.e2d");
         modelBox.setTimeStep(10f);
         modelBox.getThermostats().get(0).setDeadband(10000f);
-        HashMap<Double, double[]> qTable = new HashMap<>();
-        for ( float i = -50 ; i <= 50.1f ; i+=0.1f) {
+        Map<Double, double[]> qTable = new HashMap<>();
+        for ( float i = -500 ; i <= 500.1f ; i+=0.1f) {
             qTable.put(round(i, 1), new double[]{0, 0, 0});
         }
         modelBox.setqTable(qTable);
