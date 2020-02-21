@@ -1825,6 +1825,7 @@ public class Model2D {
         qTable.put(insideTemp2, previous);
         episodeReward += reward;
         notifyManipulationListeners(ManipulationEvent.RUN);
+
     }
 
     public void run() {
@@ -1836,10 +1837,11 @@ public class Model2D {
             while (running) {
                 nextStep();
                 if (getTime() > 86400) {
-                    doWhenIterationEnds();
+                    //doWhenIterationEnds();
                 }
                 if (getTime() % 1800 == 0) {
-                    doWhenTimestepEnds();
+                    //doWhenTimestepEnds();
+                    System.out.println(getTime());
                 }
 
                 if (fatalErrorOccurred()) {
@@ -2468,7 +2470,7 @@ public class Model2D {
             manipulationListeners.remove(listener);
     }
 
-    private void notifyManipulationListeners(byte type) {
+    public void notifyManipulationListeners(byte type) {
         if (manipulationListeners.isEmpty())
             return;
         ManipulationEvent e = new ManipulationEvent(this, type);

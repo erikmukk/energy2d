@@ -75,7 +75,7 @@ import qlearning.*;
  *
  * @author Charles Xie
  */
-public class System2D extends JApplet implements ManipulationListener {
+public class System2DNoGUI extends JApplet implements ManipulationListener {
 
     final static String BRAND_NAME = "Energy2D V3.0.4";
 
@@ -83,13 +83,13 @@ public class System2D extends JApplet implements ManipulationListener {
     View2D view;
     TaskManager taskManager;
     Task repaint, measure, control;
-    private Scripter2D scripter;
+    private Scripter2DNoGUI scripter;
     private ExecutorService threadService;
     private static boolean isApplet = true;
 
     private SAXParser saxParser;
     private DefaultHandler saxHandler;
-    private XmlEncoder encoder;
+    private XmlEncoderNoGUI encoder;
     private File currentFile;
     private URL currentURL;
     private String currentModel;
@@ -106,9 +106,9 @@ public class System2D extends JApplet implements ManipulationListener {
     private static Preferences preferences;
     static boolean launchedByJWS;
     private static boolean appDirectoryWritable = true;
-    private static System2D box;
+    private static System2DNoGUI box;
 
-    public System2D() {
+    public System2DNoGUI() {
 
         // Locale.setDefault(Locale.US); for the applet, this is a security violation
         try {
@@ -130,8 +130,8 @@ public class System2D extends JApplet implements ManipulationListener {
         addPropertyChangeListener(view);
         model.addPropertyChangeListener(view);
         getContentPane().add(view, BorderLayout.CENTER);
-        encoder = new XmlEncoder(this);
-        saxHandler = new XmlDecoder(this);
+        encoder = new XmlEncoderNoGUI(this);
+        saxHandler = new XmlDecoderNoGUI(this);
         try {
             saxParser = SAXParserFactory.newInstance().newSAXParser();
         } catch (SAXException | ParserConfigurationException e) {
@@ -224,7 +224,7 @@ public class System2D extends JApplet implements ManipulationListener {
 
         Action a = new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                Helper.showScriptDialog(System2D.this);
+                HelperNoGUI.showScriptDialog(System2DNoGUI.this);
             }
         };
         KeyStroke ks = KeyStroke.getKeyStroke(KeyEvent.VK_F3, 0, true);
@@ -260,7 +260,7 @@ public class System2D extends JApplet implements ManipulationListener {
 
         a = new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                PreferencesDialog d = new PreferencesDialog(System2D.this, true);
+                PreferencesDialogNoGUI d = new PreferencesDialogNoGUI(System2DNoGUI.this, true);
                 d.setVisible(true);
             }
         };
@@ -374,7 +374,7 @@ public class System2D extends JApplet implements ManipulationListener {
     }
 
     void saveApplet(File file) {
-        new AppletConverter(this).write(file);
+        new AppletConverterNoGUI(this).write(file);
     }
 
     private void loadStateApp(Reader reader) throws IOException {
@@ -647,16 +647,16 @@ public class System2D extends JApplet implements ManipulationListener {
         if (script == null)
             return null;
         if (scripter == null)
-            scripter = new Scripter2D(this);
+            scripter = new Scripter2DNoGUI(this);
         scripter.executeScript(script);
         if (scripter.shouldNotifySaveReminder())
             setSaved(false);
         return null;
     }
 
-    Scripter2D getScripter() {
+    Scripter2DNoGUI getScripter() {
         if (scripter == null)
-            scripter = new Scripter2D(this);
+            scripter = new Scripter2DNoGUI(this);
         return scripter;
     }
 
@@ -971,7 +971,7 @@ public class System2D extends JApplet implements ManipulationListener {
     }
 
 
-    private static void setupSimulation() {
+    public void setupSimulation() {
         Model2D modelBox = box.getModel();
         //box.loadModel("examples/thermostat.e2d");
         box.loadModel("examples/test-heating-sun-2.e2d");
@@ -989,10 +989,9 @@ public class System2D extends JApplet implements ManipulationListener {
         modelBox.setqTable(qTable);
     }
 
-    private static void startSimulation() {
+    public void startSimulation() {
         Model2D modelBox = box.getModel();
-        modelBox.notifyManipulationListeners(ManipulationEvent.RUN);
-        //modelBox.run();
+        modelBox.run();
     }
 
     public static double round(float value, int places) {
@@ -1002,155 +1001,19 @@ public class System2D extends JApplet implements ManipulationListener {
         return bd.doubleValue();
     }
 
-    public static void main(final String[] args) {
+    /*public static void main(final String[] args) {
         EventQueue.invokeLater(() -> {
             start(args);
-            setupSimulation();
-            EventQueue.invokeLater(System2D::startSimulation);
+            //setupSimulation();
+            //EventQueue.invokeLater(System2DNoGUI::startSimulation);
             //Updater.download(box);
         });
-    }
+    }*/
 
 
     private static void start(final String[] args) {
         isApplet = false;
-
-        File testFile = new File(System.getProperty("user.dir"), "test.txt");
-        // can't use File.canWrite() to check if we can write a file to this folder. So we have to walk extra miles as follows.
-        try {
-            testFile.createNewFile();
-            testFile.delete();
-        } catch (Throwable e) {
-            appDirectoryWritable = false;
-        }
-        Locale.setDefault(Locale.US);
-
-        // detect if the app is launched via webstart just checking its class loader: SystemClassLoader or JnlpClassLoader.
-        ClassLoader cl = Thread.currentThread().getContextClassLoader();
-        if (!cl.equals(ClassLoader.getSystemClassLoader()))
-            launchedByJWS = true;
-
-        if (System.getProperty("os.name").startsWith("Mac")) {
-            System.setProperty("apple.laf.useScreenMenuBar", "true");
-            System.setProperty("com.apple.mrj.application.apple.menu.about.name", BRAND_NAME);
-        }
-
-        if (preferences == null)
-            preferences = Preferences.userNodeForPackage(System2D.class);
-        Sensor.setMaximumDataPoints(preferences.getInt("Sensor Maximum Data Points", 1000));
-
-        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
-        int w = (int) (screen.height * 0.7);
-
-        box = new System2D();
-        box.view.setPreferredSize(new Dimension(w, w));
-        box.view.setGridOn(true);
-        box.view.setBorderTickmarksOn(true);
-        // new org.concord.energy2d.model.PartFactory(box.model).addBlob();
-        final JFrame frame = new JFrame();
-        frame.setIconImage(new ImageIcon(System2D.class.getResource("resources/frame.png")).getImage());
-        final MenuBar menuBar = new MenuBar(box, frame);
-        menuBar.setLatestPath(preferences.get("Latest E2D Path", null), "e2d");
-        menuBar.setLatestPath(preferences.get("Latest HTM Path", null), "htm");
-        menuBar.setLatestPath(preferences.get("Latest PNG Path", null), "png");
-        menuBar.setLatestPath(preferences.get("Latest IMG Path", null), "img");
-        menuBar.addRecentFile(preferences.get("Recent File 0", null));
-        menuBar.addRecentFile(preferences.get("Recent File 1", null));
-        menuBar.addRecentFile(preferences.get("Recent File 2", null));
-        menuBar.addRecentFile(preferences.get("Recent File 3", null));
-        frame.setJMenuBar(menuBar);
-        frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        frame.getContentPane().add(box.getContentPane(), BorderLayout.CENTER);
-        ToolBar toolBar = new ToolBar(box);
-        box.setToolBarListener(toolBar);
-        box.view.addManipulationListener(toolBar);
-        frame.getContentPane().add(toolBar, BorderLayout.NORTH);
-        JPanel bottomPanel = new JPanel(new BorderLayout());
-        bottomPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
-        bottomPanel.add(box.createButtonPanel(), BorderLayout.CENTER);
-        box.statusLabel.setPreferredSize(new Dimension(100, 24));
-        box.snapToggleButton.setFocusable(false);
-        bottomPanel.add(box.statusLabel, BorderLayout.WEST);
-        bottomPanel.add(box.snapToggleButton, BorderLayout.EAST);
-        frame.getContentPane().add(bottomPanel, BorderLayout.SOUTH);
-        int x = preferences.getInt("Upper-left x", (screen.height - w) / 8);
-        int y = preferences.getInt("Upper-left y", (screen.height - w) / 8);
-        frame.setLocation(x, y);
-        frame.setTitle(BRAND_NAME);
-        frame.pack();
-        frame.setVisible(true);
-        frame.addWindowListener(new WindowAdapter() {
-            public void windowClosing(WindowEvent e) {
-                Action a = box.view.getActionMap().get("Quit");
-                if (a != null)
-                    a.actionPerformed(null);
-            }
-
-            public void windowOpened(WindowEvent e) {
-                EventQueue.invokeLater(() -> {
-                    if (args == null)
-                        return;
-                    String filePath = null;
-                    if (launchedByJWS) {
-                        if (args.length > 1)
-                            filePath = args[1];
-                    } else {
-                        if (args.length > 0)
-                            filePath = args[0];
-                    }
-                    if (filePath != null && filePath.toLowerCase().trim().endsWith(".e2d")) {
-                        box.loadFile(new File(filePath));
-                        menuBar.e2dFileChooser.rememberFile(filePath);
-                    }
-                });
-            }
-        });
-        box.owner = frame;
-
-
-        if (System.getProperty("os.name").startsWith("Mac")) {
-            Application app = new Application();
-            app.setEnabledPreferencesMenu(true);
-            app.addApplicationListener(new ApplicationAdapter() {
-
-                @Override
-                public void handleQuit(ApplicationEvent e) {
-                    Action a = box.view.getActionMap().get("Quit");
-                    if (a != null)
-                        a.actionPerformed(null);
-                    e.setHandled(true);
-                }
-
-                @Override
-                public void handlePreferences(ApplicationEvent e) {
-                    new PreferencesDialog(box, true).setVisible(true);
-                    e.setHandled(true);
-                }
-
-                @Override
-                public void handleOpenFile(final ApplicationEvent e) {
-                    EventQueue.invokeLater(() -> {
-                        String filePath = e.getFilename();
-                        if (filePath.toLowerCase().trim().endsWith(".e2d")) {
-                            box.loadFile(new File(filePath));
-                            menuBar.e2dFileChooser.rememberFile(filePath);
-                        }
-                    });
-                    e.setHandled(true);
-                }
-
-                @Override
-                public void handleAbout(ApplicationEvent e) {
-                    Helper.showAbout(frame);
-                    e.setHandled(true);
-                }
-
-            });
-        }
-
-        //if (!launchedByJWS)
-        // UpdateAnnouncer.showMessage(box);
-
+        box = new System2DNoGUI();
     }
 
     private void run2() {
