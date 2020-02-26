@@ -1,54 +1,32 @@
 package org.concord.energy2d.system;
 
-import java.awt.Color;
-import java.awt.Font;
+import org.concord.energy2d.model.*;
+import org.concord.energy2d.util.ColorFill;
+import org.concord.energy2d.util.Scripter;
+import org.concord.energy2d.util.Texture;
+import org.concord.energy2d.util.XmlCharacterDecoder;
+import org.concord.energy2d.view.Picture;
+import org.concord.energy2d.view.View2D;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXParseException;
+import org.xml.sax.helpers.DefaultHandler;
+
+import javax.xml.bind.DatatypeConverter;
+import java.awt.*;
 import java.awt.geom.Rectangle2D;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 
-import javax.imageio.ImageIO;
-import javax.xml.bind.DatatypeConverter;
-
-import org.concord.energy2d.model.Anemometer;
-import org.concord.energy2d.model.Boundary;
-import org.concord.energy2d.model.Cloud;
-import org.concord.energy2d.model.Constants;
-import org.concord.energy2d.model.DirichletThermalBoundary;
-import org.concord.energy2d.model.Fan;
-import org.concord.energy2d.model.HeatFluxSensor;
-import org.concord.energy2d.model.Heliostat;
-import org.concord.energy2d.model.MassBoundary;
-import org.concord.energy2d.model.Particle;
-import org.concord.energy2d.model.ParticleFeeder;
-import org.concord.energy2d.model.SimpleMassBoundary;
-import org.concord.energy2d.model.ThermalBoundary;
-import org.concord.energy2d.model.Model2D;
-import org.concord.energy2d.model.NeumannThermalBoundary;
-import org.concord.energy2d.model.Part;
-import org.concord.energy2d.model.Thermometer;
-import org.concord.energy2d.model.Thermostat;
-import org.concord.energy2d.model.Tree;
-import org.concord.energy2d.util.ColorFill;
-import org.concord.energy2d.util.Scripter;
-import org.concord.energy2d.util.Texture;
-import org.concord.energy2d.util.XmlCharacterDecoder;
-import org.concord.energy2d.view.Picture;
-import org.concord.energy2d.view.TextBox;
-import org.concord.energy2d.view.View2D;
-import org.xml.sax.Attributes;
-import org.xml.sax.SAXParseException;
-import org.xml.sax.helpers.DefaultHandler;
-
 /**
  * @author Charles Xie
  *
  */
-class XmlDecoderNoGUI extends DefaultHandler {
+public class XmlDecoderHeadlessForModelExport extends DefaultHandler {
 
-    private System2DNoGUI box;
     private String str;
+    private Model2D box;
 
     // model properties
     private float modelWidth = 10;
@@ -156,14 +134,14 @@ class XmlDecoderNoGUI extends DefaultHandler {
     private float particleMass = Float.NaN;
     private Particle particle;
 
-    XmlDecoderNoGUI(System2DNoGUI box) {
-        this.box = box;
+    public XmlDecoderHeadlessForModelExport(Model2D model) {
+        this.box = model;
     }
 
     public void startDocument() {
         box.taskManager.clearCustomTasks();
         // reset for elements added later before XML was saved
-        MassBoundary b = box.model.getMassBoundary();
+        MassBoundary b = box.getMassBoundary();
         if (b instanceof SimpleMassBoundary) {
             SimpleMassBoundary smb = (SimpleMassBoundary) b;
             smb.setFlowTypeAtBorder(Boundary.LEFT, MassBoundary.REFLECTIVE);
@@ -175,90 +153,90 @@ class XmlDecoderNoGUI extends DefaultHandler {
 
     public void endDocument() {
 
-        box.view.setControlPanelVisible(controlPanel);
-        box.view.setControlPanelPosition(controlPanelPosition);
-        box.setPreviousSimulation(prevSim);
-        box.setNextSimulation(nextSim);
-        box.model.setLx(modelWidth);
-        box.model.setLy(modelHeight);
-        box.view.setArea(0, modelWidth, 0, modelHeight);
-        box.model.setTimeStep(timeStep);
-        box.measure.setInterval(measurementInterval);
-        box.control.setInterval(controlInterval);
-        box.repaint.setInterval(viewUpdateInterval);
-        box.model.setSunny(sunny);
-        box.model.setSunAngle(sunAngle);
-        box.model.setSolarPowerDensity(solarPowerDensity);
-        box.model.setSolarRayCount(solarRayCount);
-        box.model.setSolarRaySpeed(solarRaySpeed);
-        box.model.setPhotonEmissionInterval(photonEmissionInterval);
-        box.model.setPerimeterStepSize(perimeterStepSize);
-        box.model.setConvective(convective);
-        box.model.setZHeatDiffusivity(zHeatDiffusivity);
-        box.model.setZHeatDiffusivityOnlyForFluid(zHeatDiffusivityOnlyForFluid);
+//		box.view.setControlPanelVisible(controlPanel);
+//		box.view.setControlPanelPosition(controlPanelPosition);
+//        box.setPreviousSimulation(prevSim);
+//        box.setNextSimulation(nextSim);
+        box.setLx(modelWidth);
+        box.setLy(modelHeight);
+//		box.view.setArea(0, modelWidth, 0, modelHeight);
+        box.setTimeStep(timeStep);
+//		box.measure.setInterval(measurementInterval);
+//		box.control.setInterval(controlInterval);
+//		box.repaint.setInterval(viewUpdateInterval);
+        box.setSunny(sunny);
+        box.setSunAngle(sunAngle);
+        box.setSolarPowerDensity(solarPowerDensity);
+        box.setSolarRayCount(solarRayCount);
+        box.setSolarRaySpeed(solarRaySpeed);
+        box.setPhotonEmissionInterval(photonEmissionInterval);
+        box.setPerimeterStepSize(perimeterStepSize);
+        box.setConvective(convective);
+        box.setZHeatDiffusivity(zHeatDiffusivity);
+        box.setZHeatDiffusivityOnlyForFluid(zHeatDiffusivityOnlyForFluid);
         if (gravitationalAcceleration >= 0)
-            box.model.setGravitationalAcceleration(gravitationalAcceleration);
-        box.model.setThermophoreticCoefficient(thermophoreticCoefficient);
+            box.setGravitationalAcceleration(gravitationalAcceleration);
+        box.setThermophoreticCoefficient(thermophoreticCoefficient);
         if (particleDrag >= 0)
-            box.model.setParticleDrag(particleDrag);
+            box.setParticleDrag(particleDrag);
         if (particleHardness >= 0)
-            box.model.setParticleHardness(particleHardness);
-        box.model.setBackgroundConductivity(backgroundConductivity);
-        box.model.setBackgroundDensity(backgroundDensity);
-        box.model.setBackgroundSpecificHeat(backgroundSpecificHeat);
-        box.model.setBackgroundTemperature(backgroundTemperature);
-        box.model.setBackgroundViscosity(backgroundViscosity);
-        box.model.setThermalExpansionCoefficient(thermalExpansionCoefficient);
-        box.model.setBuoyancyApproximation(buoyancyApproximation);
-        box.model.setGravityType(gravityType);
+            box.setParticleHardness(particleHardness);
+        box.setBackgroundConductivity(backgroundConductivity);
+        box.setBackgroundDensity(backgroundDensity);
+        box.setBackgroundSpecificHeat(backgroundSpecificHeat);
+        box.setBackgroundTemperature(backgroundTemperature);
+        box.setBackgroundViscosity(backgroundViscosity);
+        box.setThermalExpansionCoefficient(thermalExpansionCoefficient);
+        box.setBuoyancyApproximation(buoyancyApproximation);
+        box.setGravityType(gravityType);
 
-        box.view.setGraphDataType(graphDataType);
-        box.view.setGraphTimeUnit(graphTimeUnit);
-        box.view.setFahrenheitUsed(fahrenheitUsed);
-        box.view.setViewFactorLinesOn(viewFactorLines);
-        box.view.setBorderTickmarksOn(borderTickmarks);
-        box.view.setGridOn(grid);
-        box.view.setSnapToGrid(snapToGrid);
-        box.view.setGridSize(gridSize);
-        box.view.setIsothermOn(isotherm);
-        box.view.setStreamlineOn(streamline);
-        box.view.setVelocityOn(velocity);
-        box.view.setHeatFluxArrowsOn(heatFluxArrows);
-        box.view.setHeatFluxLinesOn(heatFluxLines);
-        box.view.setColorPaletteOn(colorPalette);
-        box.view.setColorPaletteType(colorPaletteType);
-        box.view.setShowLogo(showLogo);
-        box.view.setHeatMapType(heatMapType);
-        float xColorPalette = colorPaletteX > 1 ? colorPaletteX / box.view.getWidth() : colorPaletteX;
-        float yColorPalette = colorPaletteY > 1 ? colorPaletteY / box.view.getHeight() : colorPaletteY;
-        float wColorPalette = colorPaletteW > 1 ? colorPaletteW / box.view.getWidth() : colorPaletteW;
-        float hColorPalette = colorPaletteH > 1 ? colorPaletteH / box.view.getHeight() : colorPaletteH;
-        box.view.setColorPaletteRectangle(xColorPalette, yColorPalette, wColorPalette, hColorPalette);
-        box.view.setMinimumTemperature(minimumTemperature);
-        box.view.setMaximumTemperature(maximumTemperature);
-        box.view.setFanRotationSpeedScaleFactor(fanRotationSpeedScaleFactor);
-        box.view.setClockOn(clock);
-        box.view.setSmooth(smooth);
-        box.view.setGraphOn(graphOn);
-        if (graphXLabel != null)
-            box.view.setGraphXLabel(graphXLabel);
-        if (graphYLabel != null)
-            box.view.setGraphYLabel(graphYLabel);
-        if (graphYmin != 0)
-            box.view.setGraphYmin(graphYmin);
-        if (graphYmax != 50)
-            box.view.setGraphYmax(graphYmax);
+//		box.view.setGraphDataType(graphDataType);
+//		box.view.setGraphTimeUnit(graphTimeUnit);
+//		box.view.setFahrenheitUsed(fahrenheitUsed);
+//		box.view.setViewFactorLinesOn(viewFactorLines);
+//		box.view.setBorderTickmarksOn(borderTickmarks);
+//		box.view.setGridOn(grid);
+//		box.view.setSnapToGrid(snapToGrid);
+//		box.view.setGridSize(gridSize);
+//		box.view.setIsothermOn(isotherm);
+//		box.view.setStreamlineOn(streamline);
+//		box.view.setVelocityOn(velocity);
+//		box.view.setHeatFluxArrowsOn(heatFluxArrows);
+//		box.view.setHeatFluxLinesOn(heatFluxLines);
+//		box.view.setColorPaletteOn(colorPalette);
+//		box.view.setColorPaletteType(colorPaletteType);
+//		box.view.setShowLogo(showLogo);
+//		box.view.setHeatMapType(heatMapType);
+//		float xColorPalette = colorPaletteX > 1 ? colorPaletteX / box.view.getWidth() : colorPaletteX;
+//		float yColorPalette = colorPaletteY > 1 ? colorPaletteY / box.view.getHeight() : colorPaletteY;
+//		float wColorPalette = colorPaletteW > 1 ? colorPaletteW / box.view.getWidth() : colorPaletteW;
+//		float hColorPalette = colorPaletteH > 1 ? colorPaletteH / box.view.getHeight() : colorPaletteH;
+//		box.view.setColorPaletteRectangle(xColorPalette, yColorPalette, wColorPalette, hColorPalette);
+//		box.view.setMinimumTemperature(minimumTemperature);
+//		box.view.setMaximumTemperature(maximumTemperature);
+//		box.view.setFanRotationSpeedScaleFactor(fanRotationSpeedScaleFactor);
+//		box.view.setClockOn(clock);
+//		box.view.setSmooth(smooth);
+//		box.view.setGraphOn(graphOn);
+//		if (graphXLabel != null)
+//			box.view.setGraphXLabel(graphXLabel);
+//		if (graphYLabel != null)
+//			box.view.setGraphYLabel(graphYLabel);
+//		if (graphYmin != 0)
+//			box.view.setGraphYmin(graphYmin);
+//		if (graphYmax != 50)
+//			box.view.setGraphYmax(graphYmax);
 
-        box.model.refreshPowerArray();
-        box.model.refreshTemperatureBoundaryArray();
-        box.model.refreshMaterialPropertyArrays();
-        box.model.setInitialTemperature();
-        if (box.model.isRadiative())
-            box.model.generateViewFactorMesh();
+        box.refreshPowerArray();
+        box.refreshTemperatureBoundaryArray();
+        box.refreshMaterialPropertyArrays();
+        box.setInitialTemperature();
+        if (box.isRadiative())
+            box.generateViewFactorMesh();
 
         // since we don't know the width and height of the model until now, we have to fix the locations and the sizes of
         // the sensors, since they are relative to the size of the model.
-        List<Thermometer> thermometers = box.model.getThermometers();
+        List<Thermometer> thermometers = box.getThermometers();
         if (!thermometers.isEmpty()) {
             synchronized (thermometers) {
                 for (Thermometer t : thermometers) {
@@ -270,7 +248,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                 }
             }
         }
-        List<HeatFluxSensor> heatFluxSensors = box.model.getHeatFluxSensors();
+        List<HeatFluxSensor> heatFluxSensors = box.getHeatFluxSensors();
         if (!heatFluxSensors.isEmpty()) {
             synchronized (heatFluxSensors) {
                 for (HeatFluxSensor h : heatFluxSensors) {
@@ -279,11 +257,11 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     r.height = HeatFluxSensor.RELATIVE_HEIGHT * modelHeight;
                     r.x = r.x - 0.5f * r.width;
                     r.y = r.y - 0.5f * r.height;
-                    box.model.measure(h);
+                    box.measure(h);
                 }
             }
         }
-        List<Anemometer> anemometers = box.model.getAnemometers();
+        List<Anemometer> anemometers = box.getAnemometers();
         if (!anemometers.isEmpty()) {
             synchronized (anemometers) {
                 for (Anemometer a : anemometers) {
@@ -296,7 +274,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
             }
         }
 
-        box.view.repaint();
+//		box.view.repaint();
 
         resetGlobalVariables();
 
@@ -364,7 +342,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     }
                 }
                 if (!Float.isNaN(x) && !Float.isNaN(y) && !Float.isNaN(w) && !Float.isNaN(h))
-                    part = box.model.addRectangularPart(x, y, w, h);
+                    part = box.addRectangularPart(x, y, w, h);
             }
         } else if (qName == "ellipse") {
             if (attrib != null) {
@@ -383,7 +361,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     }
                 }
                 if (!Float.isNaN(x) && !Float.isNaN(y) && !Float.isNaN(a) && !Float.isNaN(b))
-                    part = box.model.addEllipticalPart(x, y, a, b);
+                    part = box.addEllipticalPart(x, y, a, b);
             }
         } else if (qName == "ring") {
             if (attrib != null) {
@@ -402,7 +380,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     }
                 }
                 if (!Float.isNaN(x) && !Float.isNaN(y) && !Float.isNaN(inner) && !Float.isNaN(outer))
-                    part = box.model.addRingPart(x, y, inner, outer);
+                    part = box.addRingPart(x, y, inner, outer);
             }
         } else if (qName == "annulus") {
             if (attrib != null) {
@@ -425,7 +403,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     }
                 }
                 if (!Float.isNaN(x) && !Float.isNaN(y) && !Float.isNaN(innerA) && !Float.isNaN(innerB) && !Float.isNaN(outerA) && !Float.isNaN(outerB))
-                    part = box.model.addAnnulusPart(x, y, innerA, innerB, outerA, outerB);
+                    part = box.addAnnulusPart(x, y, innerA, innerB, outerA, outerB);
             }
         } else if (qName == "polygon") {
             if (attrib != null) {
@@ -448,7 +426,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                         x[i] = v[2 * i];
                         y[i] = v[2 * i + 1];
                     }
-                    part = box.model.addPolygonPart(x, y);
+                    part = box.addPolygonPart(x, y);
                 }
             }
         } else if (qName == "blob") {
@@ -472,12 +450,12 @@ class XmlDecoderNoGUI extends DefaultHandler {
                         x[i] = v[2 * i];
                         y[i] = v[2 * i + 1];
                     }
-                    part = box.model.addBlobPart(x, y);
+                    part = box.addBlobPart(x, y);
                 }
             }
         } else if (qName == "particle") {
             particle = new Particle();
-            box.model.addParticle(particle);
+            box.addParticle(particle);
         } else if (qName == "temperature_at_border") {
             if (attrib != null) {
                 float left = Float.NaN, right = Float.NaN, upper = Float.NaN, lower = Float.NaN;
@@ -496,12 +474,12 @@ class XmlDecoderNoGUI extends DefaultHandler {
                 }
                 if (!Float.isNaN(left) && !Float.isNaN(right) && !Float.isNaN(upper) && !Float.isNaN(lower)) {
                     DirichletThermalBoundary b = null;
-                    ThermalBoundary boundary = box.model.getThermalBoundary();
+                    ThermalBoundary boundary = box.getThermalBoundary();
                     if (boundary instanceof DirichletThermalBoundary) {
                         b = (DirichletThermalBoundary) boundary;
                     } else {
                         b = new DirichletThermalBoundary();
-                        box.model.setThermalBoundary(b);
+                        box.setThermalBoundary(b);
                     }
                     b.setTemperatureAtBorder(Boundary.UPPER, upper);
                     b.setTemperatureAtBorder(Boundary.RIGHT, right);
@@ -527,12 +505,12 @@ class XmlDecoderNoGUI extends DefaultHandler {
                 }
                 if (!Float.isNaN(left) && !Float.isNaN(right) && !Float.isNaN(upper) && !Float.isNaN(lower)) {
                     NeumannThermalBoundary b = null;
-                    ThermalBoundary boundary = box.model.getThermalBoundary();
+                    ThermalBoundary boundary = box.getThermalBoundary();
                     if (boundary instanceof NeumannThermalBoundary) {
                         b = (NeumannThermalBoundary) boundary;
                     } else {
                         b = new NeumannThermalBoundary();
-                        box.model.setThermalBoundary(b);
+                        box.setThermalBoundary(b);
                     }
                     b.setFluxAtBorder(Boundary.UPPER, upper);
                     b.setFluxAtBorder(Boundary.RIGHT, right);
@@ -559,7 +537,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                         lower = Byte.parseByte(attribValue);
                     }
                 }
-                SimpleMassBoundary b = (SimpleMassBoundary) box.model.getMassBoundary();
+                SimpleMassBoundary b = (SimpleMassBoundary) box.getMassBoundary();
                 b.setFlowTypeAtBorder(Boundary.UPPER, upper);
                 b.setFlowTypeAtBorder(Boundary.RIGHT, right);
                 b.setFlowTypeAtBorder(Boundary.LOWER, lower);
@@ -573,6 +551,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                 for (int i = 0, n = attrib.getLength(); i < n; i++) {
                     attribName = attrib.getQName(i).intern();
                     attribValue = attrib.getValue(i);
+                    System.out.println(attribName + "\t:" + attribValue + "\t- " + "XmlDecoderHeadlessForModelExport:554");
                     if (attribName == "x") {
                         x = Float.parseFloat(attribValue);
                     } else if (attribName == "y") {
@@ -588,7 +567,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     }
                 }
                 if (!Float.isNaN(x) && !Float.isNaN(y)) {
-                    Thermometer t = box.model.addThermometer(x, y, uid, label, stencil);
+                    Thermometer t = box.addThermometer(x, y, uid, label, stencil);
                     if (attachID != null)
                         t.setAttachID(attachID);
                 }
@@ -616,7 +595,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     }
                 }
                 if (!Float.isNaN(x) && !Float.isNaN(y)) {
-                    HeatFluxSensor h = box.model.addHeatFluxSensor(x, y, uid, label, angle);
+                    HeatFluxSensor h = box.addHeatFluxSensor(x, y, uid, label, angle);
                     if (attachID != null)
                         h.setAttachID(attachID);
                 }
@@ -644,7 +623,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     }
                 }
                 if (!Float.isNaN(x) && !Float.isNaN(y)) {
-                    Anemometer a = box.model.addAnemometer(x, y, uid, label, stencil);
+                    Anemometer a = box.addAnemometer(x, y, uid, label, stencil);
                     if (attachID != null)
                         a.setAttachID(attachID);
                 }
@@ -667,12 +646,12 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     }
                 }
                 if (!Float.isNaN(setpoint) && !Float.isNaN(deadband) && powerSourceUID != null) {
-                    Part p = box.model.getPart(powerSourceUID);
+                    Part p = box.getPart(powerSourceUID);
                     if (p != null) {
                         Thermometer t = null;
                         if (thermometerUID != null)
-                            t = box.model.getThermometer(thermometerUID);
-                        Thermostat ts = box.model.addThermostat(t, p);
+                            t = box.getThermometer(thermometerUID);
+                        Thermostat ts = box.addThermostat(t, p);
                         ts.setDeadband(deadband);
                         ts.setSetPoint(setpoint);
                     }
@@ -713,7 +692,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     c.setUid(uid);
                     c.setLabel(label);
                     c.setColor(color);
-                    box.model.addCloud(c);
+                    box.addCloud(c);
                 }
             }
         } else if (qName == "tree") {
@@ -750,7 +729,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     t.setUid(uid);
                     t.setLabel(label);
                     t.setColor(color);
-                    box.model.addTree(t);
+                    box.addTree(t);
                 }
             }
         } else if (qName == "text") {
@@ -786,14 +765,14 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     }
                 }
                 if (!Float.isNaN(x) && !Float.isNaN(y)) {
-                    TextBox t = box.view.addText(new XmlCharacterDecoder().decode(str), x, y);
-                    t.setUid(uid);
-                    t.setSize(size);
-                    t.setStyle(style);
-                    t.setFace(face);
-                    t.setColor(color);
-                    t.setBorder(border);
-                    box.view.repaint();
+//					TextBox t = box.view.addText(new XmlCharacterDecoder().decode(str), x, y);
+//					t.setUid(uid);
+//					t.setSize(size);
+//					t.setStyle(style);
+//					t.setFace(face);
+//					t.setColor(color);
+//					t.setBorder(border);
+//					box.view.repaint();
                 }
             }
         } else if (qName == "image") {
@@ -830,9 +809,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     InputStream in = new ByteArrayInputStream(DatatypeConverter.parseBase64Binary(data));
                     Picture p = null;
                     try {
-                        p = box.view.addPicture(ImageIO.read(in), format, filename, x, y);
-                    } catch (IOException e) {
-                        e.printStackTrace();
+//						p = box.view.addPicture(ImageIO.read(in), format, filename, x, y);
                     } finally {
                         try {
                             in.close();
@@ -841,16 +818,16 @@ class XmlDecoderNoGUI extends DefaultHandler {
                         }
                     }
                     if (p != null) {
-                        p.setUid(uid);
-                        p.setBorder(border);
-                        p.setDraggable(draggable);
-                        p.setX(x);
-                        p.setY(y);
-                        if (!Float.isNaN(w))
-                            p.setWidth(w);
-                        if (!Float.isNaN(h))
-                            p.setHeight(h);
-                        box.view.repaint();
+//						p.setUid(uid);
+//						p.setBorder(border);
+//						p.setDraggable(draggable);
+//						p.setX(x);
+//						p.setY(y);
+//						if (!Float.isNaN(w))
+//							p.setWidth(w);
+//						if (!Float.isNaN(h))
+//							p.setHeight(h);
+//						box.view.repaint();
                     }
                 }
             }
@@ -887,7 +864,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     f.setLabel(label);
                     f.setSpeed(speed);
                     f.setAngle(angle);
-                    box.model.addFan(f);
+                    box.addFan(f);
                 }
             }
         } else if (qName == "heliostat") {
@@ -917,13 +894,13 @@ class XmlDecoderNoGUI extends DefaultHandler {
                     }
                 }
                 if (!Float.isNaN(x) && !Float.isNaN(y) && !Float.isNaN(w) && !Float.isNaN(h)) {
-                    Heliostat hs = new Heliostat(new Rectangle2D.Float(x, y, w, h), box.model);
+                    Heliostat hs = new Heliostat(new Rectangle2D.Float(x, y, w, h), box);
                     hs.setUid(uid);
                     hs.setType(type);
                     hs.setLabel(label);
                     if (targetID != null)
-                        hs.setTarget(box.model.getPart(targetID));
-                    box.model.addHeliostat(hs);
+                        hs.setTarget(box.getPart(targetID));
+                    box.addHeliostat(hs);
                 }
             }
         } else if (qName == "particle_feeder") {
@@ -973,7 +950,7 @@ class XmlDecoderNoGUI extends DefaultHandler {
                         pf.setPeriod(period);
                     if (maximum > 0)
                         pf.setMaximum(maximum);
-                    box.model.addParticleFeeder(pf);
+                    box.addParticleFeeder(pf);
                 }
             }
         }

@@ -972,21 +972,7 @@ public class System2D extends JApplet implements ManipulationListener {
 
 
     private static void setupSimulation() {
-        Model2D modelBox = box.getModel();
-        //box.loadModel("examples/thermostat.e2d");
-        box.loadModel("examples/test-heating-sun-2.e2d");
-        modelBox.setTimeStep(10f);
-        modelBox.getThermostats().get(0).setDeadband(10000f);
-        // qTtable where map contains a map which contains an array
-        Map<Double, Map<Double, double[]>> qTable = new HashMap<>();
-        for (float insideTemp = -100 ; insideTemp <= 100.1f ; insideTemp += 0.1f) {
-            Map<Double, double[]> inside = new HashMap<>();
-            for (float outsideTemp = -100 ; outsideTemp <= 100.1f ; outsideTemp += 0.1f){
-                inside.put(round(outsideTemp, 1), new double[]{0, 0, 0});
-            }
-            qTable.put(round(insideTemp, 1), inside);
-        }
-        modelBox.setqTable(qTable);
+
     }
 
     private static void startSimulation() {

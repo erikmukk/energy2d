@@ -1,14 +1,14 @@
 package org.concord.energy2d.model;
 
-import java.awt.Shape;
+import java.awt.*;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.io.*;
 import java.util.*;
+import java.util.List;
 
 import org.concord.energy2d.event.ManipulationEvent;
 import org.concord.energy2d.event.ManipulationListener;
@@ -16,7 +16,15 @@ import org.concord.energy2d.math.Annulus;
 import org.concord.energy2d.math.Blob2D;
 import org.concord.energy2d.math.EllipticalAnnulus;
 import org.concord.energy2d.math.Polygon2D;
-import qlearning.Environment;
+import org.concord.energy2d.system.TaskManager;
+import org.concord.energy2d.system.XmlDecoderHeadlessForModelExport;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
 
 /**
  * Units:
@@ -124,7 +132,32 @@ public class Model2D {
     private List<ManipulationListener> manipulationListeners;
     private Runnable tasks;
 
+    private DefaultHandler saxHandler;
+    private SAXParser saxParser;
+    public TaskManager taskManager;
+
     public Model2D() {
+        saxHandler = new XmlDecoderHeadlessForModelExport(this);
+        try {
+            saxParser = SAXParserFactory.newInstance().newSAXParser();
+        } catch (SAXException | ParserConfigurationException e) {
+            e.printStackTrace();
+        }
+
+        taskManager = new TaskManager() {
+            @Override
+            public void runScript(String script) {
+                runNativeScript(script);
+            }
+            @Override
+            public void notifyChange() {
+            }
+            @Override
+            public int getIndexOfStep() {
+                return indexOfStep;
+            }
+        };
+        setTasks(this::run2);
 
         t = new float[nx][ny];
         u = new float[nx][ny];
@@ -178,7 +211,49 @@ public class Model2D {
         propertyChangeListeners = new ArrayList<>();
         manipulationListeners = new ArrayList<>();
 
+        //loadModel("examples/test-heating-sun-2.e2d");
     }
+
+    /////////////////
+    public void loadState(InputStream is) throws IOException {
+        if (is == null)
+            return;
+        try {
+            saxParser.parse(new InputSource(is), saxHandler);
+        } catch (SAXException e) {
+            e.printStackTrace();
+        } finally {
+            is.close();
+        }
+    }
+
+    private void loadStateApp(InputStream is) throws IOException {
+        loadState(is);
+    }
+
+    public void loadModel(String name) {
+        System.out.println("loading model " + name + "\t Model2D:235");
+        if (name == null)
+            return;
+        try {
+            loadStateApp(Model2D.class.getResourceAsStream(name));
+            System.out.println("model loaded");
+            System.out.println("thermometer count: " + thermometers.size());
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+    }
+
+    private void run2() {
+        taskManager.execute();
+    }
+
+    String runNativeScript(String script) {
+        return null;
+    }
+
+    ////////////////
 
     public int getNx() {
         return nx;
@@ -1640,194 +1715,6 @@ public class Model2D {
         clearSensorData();
     }
 
-    static float outsideInitTemp = 0;
-    static float insideInitTemp = 0;
-
-    public void setqTable(Map<Double, Map<Double, double[]>> qTable) {
-        Model2D.qTable = qTable;
-    }
-
-    static Map<Double, Map<Double, double[]>> qTable;
-    static Environment env = new Environment(outsideInitTemp, insideInitTemp);
-    static float episodeReward = 0;
-
-    private static final int CORRECT_HEATING_REWARD = 100;
-    private static final int INCORRECT_HEATING_PENALTY = -400;
-    private static final double EPS_DECAY = 0.9998;
-    private static final double LEARNING_RATE = 0.1;
-    private static final double DISCOUNT = 0.95;
-    static double epsilon = 0.9;
-    static int correct = 0;
-    static int incorrect = 0;
-    static int loops = 0;
-
-    public static double round(float value, int places) {
-        if (places < 0) throw new IllegalArgumentException();
-        BigDecimal bd = BigDecimal.valueOf(value);
-        bd = bd.setScale(places, RoundingMode.HALF_UP);
-        return bd.doubleValue();
-    }
-
-    private static int findArgmax(double[] array) {
-        float max = -2000000000;
-        int index = 0;
-        for (int i = 0 ; i < array.length ; i++) {
-            if (array[i] > max) {
-                max = i;
-                index = i;
-            }
-        } return index;
-    }
-
-    private static double findMax(double[] array) {
-        double max = -2000000000;
-        for (double i : array) {
-            if (i > max) {
-                max = i;
-            }
-        } return max;
-    }
-
-    private static int getCorrectAction(Environment env) {
-        boolean isHeating = env.isHeating();
-        boolean isHumanPresence = env.isHumanPresence();
-        double outsideTemp = env.getOutsideTemp();
-        double insideTemp = env.getInsideTemp();
-        double targetTemp = env.getTargetTemp();
-        double deadband = env.getDeadband();
-
-        int correctAction = env.DO_NOTHING;
-
-        /*if (!isHumanPresence) {
-            if (isHeating) {
-                correctAction = env.STOP_HEATING;
-            }
-        } else {
-            if (isHeating) {
-                if (insideTemp >= 20) {
-                    correctAction = env.STOP_HEATING;
-                } else {
-                    correctAction = env.HEAT;
-                }
-            } else {
-                if (insideTemp < 20) {
-                    correctAction = env.HEAT;
-                }
-                else {
-                    correctAction = env.STOP_HEATING;
-                }
-            }
-        }*/
-        if (isHeating) {
-            if (insideTemp >= targetTemp + deadband) {
-                correctAction = env.STOP_HEATING;
-            } else {
-                if (insideTemp >= outsideTemp & outsideTemp >= targetTemp) {
-                    correctAction = env.STOP_HEATING;
-                } else {
-                    if (insideTemp < targetTemp + deadband) {
-                        correctAction = env.HEAT;
-                    }
-                }
-            }
-        } else {
-            if (outsideTemp < insideTemp) {
-                if (insideTemp < targetTemp) {
-                    correctAction = env.HEAT;
-                } else {
-                    if (insideTemp >= targetTemp + deadband) {
-                        correctAction = env.STOP_HEATING;
-                    }
-                }
-            }
-            else {
-                if (insideTemp >= targetTemp + deadband) {
-                    correctAction = env.STOP_HEATING;
-                }
-            }
-        }
-        return correctAction;
-    }
-
-    private void doWhenIterationEnds() {
-        stop();
-        reset();
-        epsilon = epsilon * EPS_DECAY;
-        loops += 1;
-        System.out.println("correct: " + correct + "\tincorrect: " + incorrect + "\tloops: " + loops);
-        env = new Environment(outsideInitTemp, insideInitTemp);
-        notifyManipulationListeners(ManipulationEvent.RUN);
-    }
-
-    private void doWhenTimestepEnds() {
-        stop();
-        int reward = 0;
-
-        // Modify env to match model temp
-        // TODO: Minigil põhjusel tuleb siin NaN vahepeal. Seda peab kindlasti uurima!!! Preagune on band-aid fix
-        Thermostat heaterThermostat = this.getThermostats().get(0);
-        Thermometer insideThermometer = heaterThermostat.getThermometer();
-        Thermometer outsideThermometer = this.getThermometer("outside");
-        try {
-            env.setInsideTemp(round(insideThermometer.getCurrentData(), 1));
-            env.setOutsideTemp(round(outsideThermometer.getCurrentData(), 1));
-        } catch (Exception e) {
-            env.setInsideTemp(round(0, 1));
-            env.setOutsideTemp(round(0, 1));
-        }
-
-        // Get action
-        double insideTemp = env.getInsideTemp();
-        double outsideTemp = env.getOutsideTemp();
-        double[] _actions = qTable.get(insideTemp).get(outsideTemp);
-        int calculatedAction;
-        if (Math.random() > epsilon) {
-            calculatedAction = findArgmax(_actions);
-        } else {
-            calculatedAction = (int)(Math.random() * (2 + 1));
-        }
-        int wantedAction = getCorrectAction(env);
-
-        // Take action
-        env.takeAction(calculatedAction);
-
-        if (calculatedAction == env.HEAT) {
-            heaterThermostat.getPowerSource().setPowerSwitch(true);
-        } else if (calculatedAction == env.STOP_HEATING) {
-            heaterThermostat.getPowerSource().setPowerSwitch(false);
-        }
-
-        // Calculate episode rewards
-        if (wantedAction == calculatedAction) {
-            reward += CORRECT_HEATING_REWARD;
-            correct += 1;
-        } else {
-            reward += INCORRECT_HEATING_PENALTY;
-            incorrect += 1;
-        }
-
-        // Calculate qTable values
-        double insideTemp2 = env.getInsideTemp();
-        double outsideTemp2 = env.getOutsideTemp();
-        double maxFutureQValue = findMax(qTable.get(insideTemp2).get(outsideTemp2));
-        double currentQ = qTable.get(insideTemp2).get(outsideTemp2)[calculatedAction];
-        double newQ;
-        if (reward == CORRECT_HEATING_REWARD) {
-            newQ = CORRECT_HEATING_REWARD;
-        } else {
-            newQ = (1 - LEARNING_RATE) * currentQ + LEARNING_RATE * (reward + DISCOUNT * maxFutureQValue);
-        }
-        // Set new qTable values
-        double[] tempValues = qTable.get(insideTemp2).get(outsideTemp2);
-        tempValues[calculatedAction] = newQ;
-        Map<Double, double[]> previous = qTable.get(insideTemp2);
-        previous.put(outsideTemp2, tempValues);
-        qTable.put(insideTemp2, previous);
-        episodeReward += reward;
-        notifyManipulationListeners(ManipulationEvent.RUN);
-
-    }
-
     public void run() {
         checkPartPower();
         checkPartRadiation();
@@ -1836,14 +1723,10 @@ public class Model2D {
             running = true;
             while (running) {
                 nextStep();
-                if (getTime() > 86400) {
-                    //doWhenIterationEnds();
+                if (getTime() % 18000 == 0) {
+                    System.out.println("time from model: " + getTime());
+                    //System.out.println("temp: " + thermostats.get(0).getThermometer().getCurrentData());
                 }
-                if (getTime() % 1800 == 0) {
-                    //doWhenTimestepEnds();
-                    System.out.println(getTime());
-                }
-
                 if (fatalErrorOccurred()) {
                     notifyManipulationListeners(ManipulationEvent.STOP);
                     notifyManipulationListeners(ManipulationEvent.FATAL_ERROR_OCCURRED);
