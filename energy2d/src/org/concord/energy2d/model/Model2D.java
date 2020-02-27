@@ -16,6 +16,7 @@ import org.concord.energy2d.math.Annulus;
 import org.concord.energy2d.math.Blob2D;
 import org.concord.energy2d.math.EllipticalAnnulus;
 import org.concord.energy2d.math.Polygon2D;
+import org.concord.energy2d.system.Task;
 import org.concord.energy2d.system.TaskManager;
 import org.concord.energy2d.system.XmlDecoderHeadlessForModelExport;
 import org.xml.sax.InputSource;
@@ -215,7 +216,7 @@ public class Model2D {
     }
 
     /////////////////
-    public void loadState(InputStream is) throws IOException {
+    /*public void loadState(InputStream is) throws IOException {
         if (is == null)
             return;
         try {
@@ -247,7 +248,7 @@ public class Model2D {
             e.printStackTrace();
             return;
         }
-    }
+    }*/
 
     private void run2() {
         taskManager.execute();
@@ -1729,6 +1730,7 @@ public class Model2D {
                 nextStep();
                 if (getTime() % 18000 == 0) {
                     System.out.println("time from model: " + getTime());
+                    System.out.println("temp: " + thermostats.get(0).getThermometer().getCurrentData());
                     //System.out.println("temp: " + thermostats.get(0).getThermometer().getCurrentData());
                 }
                 if (fatalErrorOccurred()) {

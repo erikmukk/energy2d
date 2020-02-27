@@ -417,10 +417,7 @@ public class System2DHeadless implements ManipulationListener {
         }
     }
     private static void setupSimulation() {
-        Model2D model2D = new Model2D();
-        model2D.setTimeStep(10f);
-        model2D.loadModel("examples/test-heating-sun-2.e2d");
-        model2D.run();
+
 
     }
 
