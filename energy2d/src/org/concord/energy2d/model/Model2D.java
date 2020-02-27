@@ -137,12 +137,12 @@ public class Model2D {
     public TaskManager taskManager;
 
     public Model2D() {
-        saxHandler = new XmlDecoderHeadlessForModelExport(this);
+        /*saxHandler = new XmlDecoderHeadlessForModelExport(this);
         try {
             saxParser = SAXParserFactory.newInstance().newSAXParser();
         } catch (SAXException | ParserConfigurationException e) {
             e.printStackTrace();
-        }
+        }*/
 
         taskManager = new TaskManager() {
             @Override
@@ -231,12 +231,16 @@ public class Model2D {
         loadState(is);
     }
 
-    public void loadModel(String name) {
-        System.out.println("loading model " + name + "\t Model2D:235");
-        if (name == null)
+    //public void loadModel(String name) {
+    public void loadModel(InputStream is) {
+        //System.out.println("loading model " + name + "\t Model2D:235");
+        System.out.println("loading model " + "\t Model2D:235");
+        //if (name == null)
+        if (is == null)
             return;
         try {
-            loadStateApp(Model2D.class.getResourceAsStream(name));
+            //loadStateApp(Model2D.class.getResourceAsStream(name));
+            loadStateApp(is);
             System.out.println("model loaded");
             System.out.println("thermometer count: " + thermometers.size());
         } catch (IOException e) {
