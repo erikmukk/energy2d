@@ -136,6 +136,7 @@ public class Model2D {
     private DefaultHandler saxHandler;
     private SAXParser saxParser;
     public TaskManager taskManager;
+    Task measure, control;
 
     public Model2D() {
         /*saxHandler = new XmlDecoderHeadlessForModelExport(this);
@@ -159,6 +160,7 @@ public class Model2D {
             }
         };
         setTasks(this::run2);
+        createTasks();
 
         t = new float[nx][ny];
         u = new float[nx][ny];
@@ -213,6 +215,34 @@ public class Model2D {
         manipulationListeners = new ArrayList<>();
 
         //loadModel("examples/test-heating-sun-2.e2d");
+    }
+
+    public void addTask(Task t) {
+        taskManager.add(t);
+    }
+
+    private void createTasks() {
+        measure = new Task(100) {
+            @Override
+            public void execute() {
+                takeMeasurement();
+            }
+        };
+        measure.setUid("MEASURE");
+        measure.setDescription("Take the measurements from the sensors.");
+        addTask(measure);
+
+        control = new Task(100) {
+            @Override
+            public void execute() {
+                control();
+            }
+        };
+        control.setUid("CONTROL");
+        control.setDescription("Invoke the controllers (e.g., thermostats).");
+        addTask(control);
+
+        taskManager.processPendingRequests();
     }
 
     /////////////////
