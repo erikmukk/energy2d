@@ -551,7 +551,6 @@ public class XmlDecoderHeadlessForModelExport extends DefaultHandler {
                 for (int i = 0, n = attrib.getLength(); i < n; i++) {
                     attribName = attrib.getQName(i).intern();
                     attribValue = attrib.getValue(i);
-                    System.out.println(attribName + "\t:" + attribValue + "\t- " + "XmlDecoderHeadlessForModelExport:554");
                     if (attribName == "x") {
                         x = Float.parseFloat(attribValue);
                     } else if (attribName == "y") {

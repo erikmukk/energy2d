@@ -1759,9 +1759,7 @@ public class Model2D {
             while (running) {
                 nextStep();
                 if (getTime() % 18000 == 0) {
-                    System.out.println("time from model: " + getTime());
-                    System.out.println("temp: " + thermostats.get(0).getThermometer().getCurrentData());
-                    //System.out.println("temp: " + thermostats.get(0).getThermometer().getCurrentData());
+                    //System.out.println("time from model: " + getTime());
                 }
                 if (fatalErrorOccurred()) {
                     notifyManipulationListeners(ManipulationEvent.STOP);
