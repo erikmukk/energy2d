@@ -37,7 +37,7 @@ import org.concord.energy2d.view.View2D;
  * @author Charles Xie
  *
  */
-class Scripter2DForModel extends Scripter {
+public class Scripter2DForModel extends Scripter {
 
     private final static Pattern MOVE_SUN = compile("(^(?i)movesun\\b){1}");
     private final static Pattern MESSAGE = compile("(^(?i)message\\b){1}");
@@ -64,7 +64,7 @@ class Scripter2DForModel extends Scripter {
     private boolean arrayUpdateRequested, temperatureInitializationRequested;
     private boolean notifySaveReminder = true;
 
-    Scripter2DForModel(Model2D m2d) {
+    public Scripter2DForModel(Model2D m2d) {
         this.model = m2d;
     }
 

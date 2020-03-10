@@ -16,6 +16,7 @@ import org.concord.energy2d.math.Annulus;
 import org.concord.energy2d.math.Blob2D;
 import org.concord.energy2d.math.EllipticalAnnulus;
 import org.concord.energy2d.math.Polygon2D;
+import org.concord.energy2d.system.Scripter2DForModel;
 import org.concord.energy2d.system.Task;
 import org.concord.energy2d.system.TaskManager;
 import org.concord.energy2d.system.XmlDecoderHeadlessForModelExport;
@@ -137,6 +138,7 @@ public class Model2D {
     private SAXParser saxParser;
     public TaskManager taskManager;
     Task measure, control;
+    private Scripter2DForModel scripter;
 
     public Model2D() {
         /*saxHandler = new XmlDecoderHeadlessForModelExport(this);
@@ -285,6 +287,10 @@ public class Model2D {
     }
 
     String runNativeScript(String script) {
+        if (scripter == null) {
+            scripter = new Scripter2DForModel(this);
+        }
+        scripter.executeScript(script);
         return null;
     }
 

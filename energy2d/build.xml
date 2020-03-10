@@ -6,7 +6,7 @@
 	<property name="build.classes.dir" value="classes" />
 	<property name="build.dist.dir" value="C:\dist" />
 	
-	<condition property="JAVA_HOME" value="C:\Program Files\Java\jdk1.8.0_241">
+	<condition property="JAVA_HOME" value="C:\Program Files\Java\jdk1.8.0_191">
 		<os family="windows" />
 	</condition>
 	<condition property="JAVA_HOME" value="/Library/Java/JavaVirtualMachines/jdk1.8.0_162.jdk/Contents/Home">
@@ -122,7 +122,7 @@
 	</target>
 
 	<target name="compile" depends="clean">
-		<javac includeantruntime="false" srcdir="${build.src.dir}" destdir="${build.classes.dir}" fork="yes" executable="C:\Program Files\Java\jdk1.8.0_241\bin\javac" source="1.8" target="1.8" debug="on" classpathref="CLASSPATH">
+		<javac includeantruntime="false" srcdir="${build.src.dir}" destdir="${build.classes.dir}" fork="yes" executable="C:\Program Files\Java\jdk1.8.0_191\bin\javac" source="1.8" target="1.8" debug="on" classpathref="CLASSPATH">
 		</javac>
 		<!-- Copy resources to build.classes.dir -->
 		<copy todir="${build.classes.dir}/org/concord/energy2d/system/examples">
