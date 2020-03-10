@@ -66,8 +66,6 @@ import com.apple.eawt.Application;
 import com.apple.eawt.ApplicationAdapter;
 import com.apple.eawt.ApplicationEvent;
 
-import qlearning.*;
-
 
 /**
  * Deploy as an app (energy2d.jar) or an applet (energy2d-applet.jar). The applet has no menu bar and tool bar and doesn't include /models and /resources.
@@ -970,43 +968,9 @@ public class System2D extends JApplet implements ManipulationListener {
         }
     }
 
-
-    private static void setupSimulation() {
-        Model2D modelBox = box.getModel();
-        //box.loadModel("examples/thermostat.e2d");
-        box.loadModel("examples/test-heating-sun-2.e2d");
-        modelBox.setTimeStep(10f);
-        modelBox.getThermostats().get(0).setDeadband(10000f);
-        // qTtable where map contains a map which contains an array
-        Map<Double, Map<Double, double[]>> qTable = new HashMap<>();
-        for (float insideTemp = -100 ; insideTemp <= 100.1f ; insideTemp += 0.1f) {
-            Map<Double, double[]> inside = new HashMap<>();
-            for (float outsideTemp = -100 ; outsideTemp <= 100.1f ; outsideTemp += 0.1f){
-                inside.put(round(outsideTemp, 1), new double[]{0, 0, 0});
-            }
-            qTable.put(round(insideTemp, 1), inside);
-        }
-        modelBox.setqTable(qTable);
-    }
-
-    private static void startSimulation() {
-        Model2D modelBox = box.getModel();
-        modelBox.notifyManipulationListeners(ManipulationEvent.RUN);
-        //modelBox.run();
-    }
-
-    public static double round(float value, int places) {
-        if (places < 0) throw new IllegalArgumentException();
-        BigDecimal bd = BigDecimal.valueOf(value);
-        bd = bd.setScale(places, RoundingMode.HALF_UP);
-        return bd.doubleValue();
-    }
-
     public static void main(final String[] args) {
         EventQueue.invokeLater(() -> {
             start(args);
-            setupSimulation();
-            EventQueue.invokeLater(System2D::startSimulation);
             //Updater.download(box);
         });
     }
