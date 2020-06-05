@@ -6,10 +6,12 @@ import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.beans.PropertyChangeSupport;
 import java.io.*;
 import java.util.*;
 import java.util.List;
 
+import jdk.nashorn.internal.runtime.Property;
 import org.concord.energy2d.event.ManipulationEvent;
 import org.concord.energy2d.event.ManipulationListener;
 import org.concord.energy2d.math.Annulus;
@@ -140,6 +142,7 @@ public class Model2D {
     Task measure, control;
     private Scripter2DForModel scripter;
 
+
     public Model2D() {
         /*saxHandler = new XmlDecoderHeadlessForModelExport(this);
         try {
@@ -246,41 +249,6 @@ public class Model2D {
 
         taskManager.processPendingRequests();
     }
-
-    /////////////////
-    /*public void loadState(InputStream is) throws IOException {
-        if (is == null)
-            return;
-        try {
-            saxParser.parse(new InputSource(is), saxHandler);
-        } catch (SAXException e) {
-            e.printStackTrace();
-        } finally {
-            is.close();
-        }
-    }
-
-    private void loadStateApp(InputStream is) throws IOException {
-        loadState(is);
-    }
-
-    //public void loadModel(String name) {
-    public void loadModel(InputStream is) {
-        //System.out.println("loading model " + name + "\t Model2D:235");
-        System.out.println("loading model " + "\t Model2D:235");
-        //if (name == null)
-        if (is == null)
-            return;
-        try {
-            //loadStateApp(Model2D.class.getResourceAsStream(name));
-            loadStateApp(is);
-            System.out.println("model loaded");
-            System.out.println("thermometer count: " + thermometers.size());
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
-        }
-    }*/
 
     private void run2() {
         taskManager.execute();
@@ -1756,6 +1724,23 @@ public class Model2D {
         clearSensorData();
     }
 
+    private void oneMinuteHasPassed(float time) {
+        notifyListeners(this, "TIME", time, time);
+        pause();
+    }
+
+    private List<PropertyChangeListener> listener = new ArrayList<>();
+
+    private void notifyListeners(Object object, String property, Float oldValue, Float newValue) {
+        for (PropertyChangeListener name : listener) {
+            name.propertyChange(new PropertyChangeEvent(this, property, oldValue, newValue));
+        }
+    }
+
+    public void addChangeListener(PropertyChangeListener newListener) {
+        listener.add(newListener);
+    }
+
     public void run() {
         checkPartPower();
         checkPartRadiation();
@@ -1764,8 +1749,8 @@ public class Model2D {
             running = true;
             while (running) {
                 nextStep();
-                if (getTime() % 18000 == 0) {
-                    //System.out.println("time from model: " + getTime());
+                if (getTime() % 60 == 0) {
+                    oneMinuteHasPassed(getTime());
                 }
                 if (fatalErrorOccurred()) {
                     notifyManipulationListeners(ManipulationEvent.STOP);
@@ -1783,6 +1768,14 @@ public class Model2D {
                 notifyManipulationListeners(ManipulationEvent.REPAINT);
             }
         }
+    }
+
+    public void pause() {
+        running = false;
+    }
+
+    public void resume() {
+        running = true;
     }
 
     public boolean fatalErrorOccurred() {
